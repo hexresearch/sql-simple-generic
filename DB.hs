@@ -1,8 +1,17 @@
 module DB where
 
 import Data.Text (Text)
+import Data.Proxy
 
 -- DAL/Abstract
+--
+
+class HasColumn a where
+  column :: a -> Text
+
+class HasColumns a where
+  columns :: a -> [Text]
+
 class HasTable a e where
   tablename :: e -> a -> Text
 
@@ -17,11 +26,13 @@ class HasTable a e => InsertStatement a m e where
 class ExistsStatement a m e where
   exists :: e -> a -> m Bool
 
+class SelectStatement a q m e where
+  select :: e -> q -> m a
+
 class HasConnection e m where
   type DbConnection e :: *
   getConnection :: e -> m (DbConnection e)
 
 class HasTransaction e m where
   transaction :: e -> m () -> m ()
-
 
