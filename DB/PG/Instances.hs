@@ -64,15 +64,15 @@ type instance SelectRowType (From t (Rows [(a1,a2)])) = (a1,a2)
 type instance SelectRowType (From t (Rows [(a1,a2,a3)])) = (a1,a2,a3)
 type instance SelectRowType (From t (Rows [(a1,a2,a3,a4)])) = (a1,a2,a3,a4)
 
-instance ( HasTable q PostgreSQLEngine
-         , HasColumns q
-         , FromRow a
-         , a ~ SelectRowType q
-         ) => SelectStatement [a] q IO PostgreSQLEngine
+instance ( HasTable   (From t (Rows [row])) PostgreSQLEngine
+         , HasColumns (From t (Rows [row]))
+         , FromRow row
+         ) => SelectStatement (From t (Rows [row])) IO PostgreSQLEngine
       where
+        type SelectResult (From t (Rows [row])) = [row]
         select eng q = do
           conn <- getConnection eng
-          query_ conn [qc|select {cols} from {table}|] :: IO [SelectRowType q]
+          query_ conn [qc|select {cols} from {table}|]
           where table = tablename eng q
                 cols  = Text.intercalate "," (columns q)
 
@@ -107,7 +107,6 @@ instance ( HasColumn t (Proxy a1)
                   , column (Proxy @t) (Proxy @a3)
                   , column (Proxy @t) (Proxy @a4)
                   ]
-
 
 instance KnownSymbol t => HasTable (From t cols) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))

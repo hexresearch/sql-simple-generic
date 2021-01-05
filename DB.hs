@@ -28,8 +28,9 @@ class ExistsStatement a m e where
   exists :: e -> a -> m Bool
 
 
-class SelectStatement a q m e where
-  select :: e -> q -> m a
+class SelectStatement q m e where
+  type SelectResult q :: *
+  select :: e -> q -> m (SelectResult q)
 
 class HasConnection e m where
   type DbConnection e :: *
