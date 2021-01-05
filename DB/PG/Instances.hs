@@ -40,14 +40,17 @@ instance ToField Price where
 instance ToField Volume where
   toField (Volume x) = toField (realToFrac x :: Scientific)
 
-instance HasColumn (Proxy Symbol) where
-  column = const "symbol"
+-- instance HasColumn (Proxy Symbol) where
+--   column = const "symbol"
 
-instance HasColumn (Proxy BondShortName) where
-  column = const "value"
+-- instance HasColumn (Proxy BondFullName) where
+--   column = const "value"
 
-instance HasColumn (Proxy BondFullName) where
-  column = const "value"
+-- instance HasColumn (Proxy Symbol) where
+--   column = const "symbol"
+
+-- instance HasColumn (Proxy BondShortName) where
+--   column = const "value"
 
 instance (HasColumn (Proxy a), HasColumn (Proxy b)) => HasColumns (Proxy (a, b)) where
   columns = const [ column (Proxy @a), column (Proxy @b) ]
@@ -57,12 +60,13 @@ newtype AllFrom = AllFrom Text
 instance HasTable AllFrom PostgreSQLEngine where
   tablename _ (AllFrom x) = x
 
-instance (HasTable q PostgreSQLEngine, HasColumns (Proxy a), FromRow a)
+instance (HasTable q PostgreSQLEngine, HasColumns q, FromRow a)
   => SelectStatement [a] q IO PostgreSQLEngine
       where
         select eng q = do
           conn <- getConnection eng
+          print [qc|select {cols} from {table}|]
           query_ conn [qc|select {cols} from {table}|]
           where table = tablename eng q
-                cols  = Text.intercalate "," (columns (Proxy :: Proxy a))
+                cols  = Text.intercalate "," (columns q)
 
