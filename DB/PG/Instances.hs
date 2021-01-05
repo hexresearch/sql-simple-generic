@@ -72,7 +72,7 @@ instance ( HasTable q PostgreSQLEngine
       where
         select eng q = do
           conn <- getConnection eng
-          query_ conn [qc|select {cols} from {table}|]
+          query_ conn [qc|select {cols} from {table}|] :: IO [SelectRowType q]
           where table = tablename eng q
                 cols  = Text.intercalate "," (columns q)
 

@@ -27,6 +27,7 @@ class HasTable a e => InsertStatement a m e where
 class ExistsStatement a m e where
   exists :: e -> a -> m Bool
 
+
 class SelectStatement a q m e where
   select :: e -> q -> m a
 
