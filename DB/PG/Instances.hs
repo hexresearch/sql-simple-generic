@@ -35,6 +35,15 @@ instance FromField Symbol where
 instance FromField Volume where
   fromField f x = (Volume <$> realToFrac) <$> fromField f x
 
+instance FromField BondCouponFreq where
+  fromField f x = BondCouponFreq <$> fromField f x
+
+instance FromField BondIssueDate where
+  fromField f x = BondIssueDate <$> fromField f x
+
+instance FromField BondMatDate where
+  fromField f x = BondMatDate <$> fromField f x
+
 instance FromField BondShortName where
   fromField f x = BondShortName <$> fromField f x
 
@@ -126,6 +135,24 @@ instance HasColumn "bondfullname" (Proxy BondFullName) where
 instance HasColumn "bondtradeagg" (Proxy Symbol) where
   column _ _ = "symbol"
 
+instance HasColumn "bondcouponfreq" (Proxy Symbol) where
+  column _ _ = "symbol"
+
+instance HasColumn "bondcouponfreq" (Proxy BondCouponFreq) where
+  column _ _ = "value"
+
+instance HasColumn "bondissuedate" (Proxy Symbol) where
+  column _ _ = "symbol"
+
+instance HasColumn "bondissuedate" (Proxy BondIssueDate) where
+  column _ _ = "value"
+
+instance HasColumn "bondmatdate" (Proxy Symbol) where
+  column _ _ = "symbol"
+
+instance HasColumn "bondmatdate" (Proxy BondMatDate) where
+  column _ _ = "value"
+
 newtype TradeAggDate = TradeAggDate Day
                        deriving (Eq,Ord,Show,Data,Generic)
 
@@ -150,4 +177,15 @@ instance HasColumn "bondtradeagg" (Proxy TradeAggVol) where
 instance HasColumn "bondtradeagg" (Proxy TradeAggNum) where
   column _ _  = "trades"
 
+instance HasColumn "vbonddate" (Proxy Symbol) where
+  column _ _  = "symbol"
+
+instance HasColumn "vbonddate" (Proxy BondIssueDate) where
+  column _ _  = "issuedate"
+
+instance HasColumn "vbonddate" (Proxy BondMatDate) where
+  column _ _  = "matdate"
+
+instance HasColumn "vbonddate" (Proxy BondCouponFreq) where
+  column _ _  = "freq"
 
