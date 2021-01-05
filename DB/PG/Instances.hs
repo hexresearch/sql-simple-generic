@@ -9,8 +9,11 @@ import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple.ToField
 import Data.Proxy
 import Data.Scientific
+import Data.String
 import Data.Text (Text)
+import GHC.TypeLits (KnownSymbol(..), symbolVal)
 import qualified Data.Text as Text
+import qualified GHC.TypeLits as T
 import Text.InterpolatedString.Perl6 (qc)
 
 import DB.PG
@@ -40,33 +43,45 @@ instance ToField Price where
 instance ToField Volume where
   toField (Volume x) = toField (realToFrac x :: Scientific)
 
--- instance HasColumn (Proxy Symbol) where
---   column = const "symbol"
+data From (table :: T.Symbol) cols = All
+data Rows cols
 
--- instance HasColumn (Proxy BondFullName) where
---   column = const "value"
+type family SelectRowType a :: *
 
--- instance HasColumn (Proxy Symbol) where
---   column = const "symbol"
+type instance SelectRowType (From t (Rows [row])) = row
 
--- instance HasColumn (Proxy BondShortName) where
---   column = const "value"
-
-instance (HasColumn (Proxy a), HasColumn (Proxy b)) => HasColumns (Proxy (a, b)) where
-  columns = const [ column (Proxy @a), column (Proxy @b) ]
-
-newtype AllFrom = AllFrom Text
-
-instance HasTable AllFrom PostgreSQLEngine where
-  tablename _ (AllFrom x) = x
-
-instance (HasTable q PostgreSQLEngine, HasColumns q, FromRow a)
-  => SelectStatement [a] q IO PostgreSQLEngine
+instance ( HasTable q PostgreSQLEngine
+         , HasColumns q
+         , FromRow a
+         , SelectRowType q ~ a
+         ) => SelectStatement [a] q IO PostgreSQLEngine
       where
         select eng q = do
           conn <- getConnection eng
-          print [qc|select {cols} from {table}|]
           query_ conn [qc|select {cols} from {table}|]
           where table = tablename eng q
                 cols  = Text.intercalate "," (columns q)
+
+instance ( HasColumn t (Proxy a)
+         , HasColumn t (Proxy b)
+         , KnownSymbol t
+         ) => HasColumns (From t (Rows [(a, b)])) where
+  columns = const [ column (Proxy @t) (Proxy @a), column (Proxy @t) (Proxy @b) ]
+
+
+instance KnownSymbol t => HasTable (From t cols) e where
+  tablename _ _ = fromString (symbolVal (Proxy @t))
+
+instance HasColumn "bondshortname" (Proxy Symbol) where
+  column _ _ = "symbol"
+
+instance HasColumn "bondshortname" (Proxy BondShortName) where
+  column _ _ = "value"
+
+instance HasColumn "bondfullname" (Proxy Symbol) where
+  column _ _ = "symbol"
+
+instance HasColumn "bondfullname" (Proxy BondFullName) where
+  column _ _ = "value"
+
 

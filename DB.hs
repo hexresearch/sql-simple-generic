@@ -1,13 +1,14 @@
 module DB where
 
+import GHC.TypeLits
 import Data.Text (Text)
 import Data.Proxy
 
 -- DAL/Abstract
 --
 
-class HasColumn a where
-  column :: a -> Text
+class KnownSymbol t => HasColumn t a where
+  column :: (Proxy t) -> a -> Text
 
 class HasColumns a where
   columns :: a -> [Text]
