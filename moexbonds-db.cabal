@@ -40,11 +40,14 @@ library
   -- other-extensions:
   build-depends:       base ^>=4.13.0.0
                      , bytestring
-                     , text
-                     , postgresql-simple
-                     , interpolatedstring-perl6
-                     , scientific
                      , data-moex
+                     , interpolatedstring-perl6
                      , newtype
+                     , postgresql-simple
+                     , scientific
+                     , text
+                     , text-conversions
+                     , time
+
   -- hs-source-dirs:
   default-language:    Haskell2010
