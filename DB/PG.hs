@@ -58,13 +58,6 @@ from :: Table t
 from = From
 
 
-type family SelectRowType a :: *
-
-type instance SelectRowType (RecordSet t [(a1,a2)]) = (a1,a2)
-type instance SelectRowType (RecordSet t [(a1,a2,a3)]) = (a1,a2,a3)
-type instance SelectRowType (RecordSet t [(a1,a2,a3,a4)]) = (a1,a2,a3,a4)
-type instance SelectRowType (RecordSet t [(a1,a2,a3,a4,a5)]) = (a1,a2,a3,a4,a5)
-
 instance KnownSymbol t => HasTable (RecordSet t cols) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))
 
@@ -82,28 +75,23 @@ instance ( KnownSymbol t
           conn <- getConnection eng
           query_ conn [qc|select {cols} from {table}|]
           where table = tablename eng q
-                cols  = Text.intercalate "," (columns q)
+                cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
 
 
 instance ( KnownSymbol t
+         , HasColumns (RecordSet t [row])
          , FromRow row
          ) => SelectStatement (Select (Rows [row]) (Table t) p) IO PostgreSQLEngine where
   type SelectResult (Select (Rows [row]) (Table t) p) = [row]
   select eng q = do
     conn <- getConnection eng
-    query_ @row conn [qc|select * from {table}|]
-    error "FUCK!"
+    query_ @row conn [qc|select {cols} from {table}|]
     where
       table = tablename eng (Proxy @(Table t))
-      cols  = Text.intercalate "," (columns q)
+      cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
 
 instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
   tablename _ _ = fromString $ symbolVal (Proxy @t)
-
-instance ( KnownSymbol t
-         , HasColumns (RecordSet t cols)
-         )  => HasColumns (All (RecordSet t cols)) where
-  columns _ = columns (RecordSet :: RecordSet t cols)
 
 instance ( HasColumn t (Proxy a)
          , HasColumn t (Proxy b)

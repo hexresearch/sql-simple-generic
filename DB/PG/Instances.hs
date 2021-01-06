@@ -23,6 +23,9 @@ import Text.InterpolatedString.Perl6 (qc)
 import DB.PG
 import Data.MOEX
 
+instance ToText Day where
+  toText d = toText (show d)
+
 instance FromRow Symbol where
   fromRow = Symbol <$> field
 
@@ -103,15 +106,26 @@ newtype TradeAggDate = TradeAggDate Day
 
 instance Newtype TradeAggDate Day
 
+instance ToText TradeAggDate where
+  toText = toText . Newtype.unpack
+
 newtype TradeAggVol  = TradeAggVol (Maybe Scientific)
                        deriving (Eq,Ord,Show,Data,Generic)
 
 instance Newtype TradeAggVol (Maybe Scientific)
 
-newtype TradeAggNum  = TradeAggNum  Int
+instance ToText TradeAggVol where
+  toText (TradeAggVol (Just x))  = toText (show x)
+  toText (TradeAggVol Nothing) = " -- "
+
+newtype TradeAggNum  = TradeAggNum (Maybe Int)
                        deriving (Eq,Ord,Show,Data,Generic)
 
-instance Newtype TradeAggNum Int
+instance Newtype TradeAggNum (Maybe Int)
+
+instance ToText TradeAggNum where
+  toText (TradeAggNum (Just x)) = toText (show x)
+  toText (TradeAggNum Nothing)  = " -- "
 
 instance HasColumn "bondtradeagg" (Proxy TradeAggDate) where
   column _ _  = "day"
