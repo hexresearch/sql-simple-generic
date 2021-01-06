@@ -58,9 +58,6 @@ rows = Rows
 from :: Table t
 from = From
 
-class SQLPredFrom a e where
-  sqlPredFrom :: e -> a -> Text
-
 instance KnownSymbol t => HasTable (RecordSet t cols) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))
 
@@ -85,7 +82,7 @@ instance ( KnownSymbol t
          , FromRow row
          ) => SelectStatement (Select (Rows [row]) (Table t) pred) IO PostgreSQLEngine where
   type SelectResult (Select (Rows [row]) (Table t) pred) = [row]
-  select eng q = do
+  select eng (Select _ _ (Where p)) = do
     conn <- getConnection eng
     query_ @row conn [qc|
     select {cols} from {table}
@@ -96,11 +93,16 @@ instance ( KnownSymbol t
       table = tablename eng (Proxy @(Table t))
       cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
       whereCols :: Text.Text
-      whereCols = "" -- sqlPredFrom eng q
+      whereCols = sqlText (Proxy @(Table t)) p
 
--- instance HasColumns pred =>
---   SQLPredFrom (Select (Rows [row]) (Table t) (Where pred)) PostgreSQLEngine where
---   sqlPredFrom _ (Select _ _ (Where col)) = undefined
+sqlText :: HasColumn t pred => t -> pred -> Text
+sqlText = undefined
+
+-- sqlText :: QueryPart
+
+-- instance HasSQLPred a PostgreSQLEngine where
+--   sqlPredText e pred = undefined
+--     where col = column
 
 instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
   tablename _ _ = fromString $ symbolVal (Proxy @t)
