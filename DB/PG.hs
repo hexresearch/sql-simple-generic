@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
+{-# LANGUAGE UndecidableInstances #-}
 module DB.PG ( module DB
              , module DB.PG
              ) where
@@ -46,17 +47,30 @@ data Rows cols = Rows
 
 data RecordSet (table :: Symbol) cols = RecordSet
 
+data QueryPart (table :: Symbol) pred = QueryPart pred
+
 data Where p = Where p
 
 data Select what from pred = Select what from (Where pred)
 
 data All a = All
 
+data Pred a = Eq a
+
+newtype Bound a = Bound a
+
 rows :: Rows a
 rows = Rows
 
 from :: Table t
 from = From
+
+class SQLQueryPart t p where
+  sqlFrom :: QueryPart t p -> Text
+
+class HasBoundValues a e where
+  type BoundValues a e :: *
+  boundValues :: e -> a -> BoundValues a e
 
 instance KnownSymbol t => HasTable (RecordSet t cols) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))
@@ -79,33 +93,34 @@ instance ( KnownSymbol t
 
 instance ( KnownSymbol t
          , HasColumns (RecordSet t [row])
+         , HasColumns (QueryPart t (Where pred))
          , FromRow row
+         , HasBoundValues (Bound pred) PostgreSQLEngine
+         , ToRow (BoundValues (Bound pred) PostgreSQLEngine)
          ) => SelectStatement (Select (Rows [row]) (Table t) pred) IO PostgreSQLEngine where
   type SelectResult (Select (Rows [row]) (Table t) pred) = [row]
   select eng (Select _ _ (Where p)) = do
     conn <- getConnection eng
-    query_ @row conn [qc|
-    select {cols} from {table}
-    where {whereCols}
-    ;
-|]
+    let sql = [qc|select {cols} from {table} where {whereCols};|]
+    query conn sql (boundValues eng (Bound p))
     where
       table = tablename eng (Proxy @(Table t))
       cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
       whereCols :: Text.Text
-      whereCols = sqlText (Proxy @(Table t)) p
+      whereCols =
+        Text.intercalate " and " [  [qc|{c} = ?|] | c <- columns (QueryPart @t (Where p)) ]
 
-sqlText :: HasColumn t pred => t -> pred -> Text
-sqlText = undefined
-
--- sqlText :: QueryPart
-
--- instance HasSQLPred a PostgreSQLEngine where
---   sqlPredText e pred = undefined
---     where col = column
+instance (KnownSymbol t, HasColumn t (Proxy p)) => HasColumns (QueryPart t (Where p)) where
+  columns = const [ column (Proxy @t) (Proxy @p) ]
 
 instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
   tablename _ _ = fromString $ symbolVal (Proxy @t)
+
+instance ( HasColumn t (Proxy a)
+         , KnownSymbol t
+         ) => HasColumns (QueryPart t [(a,b)])   where
+  columns = const [ column (Proxy @t) (Proxy @a)
+                  ]
 
 instance ( HasColumn t (Proxy a)
          , HasColumn t (Proxy b)
@@ -155,4 +170,9 @@ instance ( HasColumn t (Proxy a1)
                   , column (Proxy @t) (Proxy @a4)
                   , column (Proxy @t) (Proxy @a5)
                   ]
+
+
+instance HasBoundValues (Bound a) PostgreSQLEngine where
+  type BoundValues (Bound a) PostgreSQLEngine = Only a
+  boundValues _ (Bound x) = Only x
 
