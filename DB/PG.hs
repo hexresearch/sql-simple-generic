@@ -7,6 +7,7 @@ import Database.PostgreSQL.Simple
 import Data.ByteString (ByteString)
 import Data.Proxy
 import Data.String (IsString(..))
+import Data.Text (Text)
 import GHC.TypeLits
 import qualified Data.Text as Text
 import Text.InterpolatedString.Perl6 (qc)
@@ -57,6 +58,8 @@ rows = Rows
 from :: Table t
 from = From
 
+class SQLPredFrom a e where
+  sqlPredFrom :: e -> a -> Text
 
 instance KnownSymbol t => HasTable (RecordSet t cols) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))
@@ -77,18 +80,27 @@ instance ( KnownSymbol t
           where table = tablename eng q
                 cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
 
-
 instance ( KnownSymbol t
          , HasColumns (RecordSet t [row])
          , FromRow row
-         ) => SelectStatement (Select (Rows [row]) (Table t) p) IO PostgreSQLEngine where
-  type SelectResult (Select (Rows [row]) (Table t) p) = [row]
+         ) => SelectStatement (Select (Rows [row]) (Table t) pred) IO PostgreSQLEngine where
+  type SelectResult (Select (Rows [row]) (Table t) pred) = [row]
   select eng q = do
     conn <- getConnection eng
-    query_ @row conn [qc|select {cols} from {table}|]
+    query_ @row conn [qc|
+    select {cols} from {table}
+    where {whereCols}
+    ;
+|]
     where
       table = tablename eng (Proxy @(Table t))
       cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
+      whereCols :: Text.Text
+      whereCols = "" -- sqlPredFrom eng q
+
+-- instance HasColumns pred =>
+--   SQLPredFrom (Select (Rows [row]) (Table t) (Where pred)) PostgreSQLEngine where
+--   sqlPredFrom _ (Select _ _ (Where col)) = undefined
 
 instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
   tablename _ _ = fromString $ symbolVal (Proxy @t)
@@ -97,8 +109,9 @@ instance ( HasColumn t (Proxy a)
          , HasColumn t (Proxy b)
          , KnownSymbol t
          ) => HasColumns (RecordSet t [(a, b)]) where
-  columns = const [ column (Proxy @t) (Proxy @a), column (Proxy @t) (Proxy @b) ]
-
+  columns = const [ column (Proxy @t) (Proxy @a)
+                  , column (Proxy @t) (Proxy @b)
+                  ]
 
 instance ( HasColumn t (Proxy a1)
          , HasColumn t (Proxy a2)

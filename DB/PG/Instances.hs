@@ -116,7 +116,7 @@ instance Newtype TradeAggVol (Maybe Scientific)
 
 instance ToText TradeAggVol where
   toText (TradeAggVol (Just x))  = toText (show x)
-  toText (TradeAggVol Nothing) = " -- "
+  toText (TradeAggVol Nothing) = ""
 
 newtype TradeAggNum  = TradeAggNum (Maybe Int)
                        deriving (Eq,Ord,Show,Data,Generic)
@@ -125,7 +125,7 @@ instance Newtype TradeAggNum (Maybe Int)
 
 instance ToText TradeAggNum where
   toText (TradeAggNum (Just x)) = toText (show x)
-  toText (TradeAggNum Nothing)  = " -- "
+  toText (TradeAggNum Nothing)  = ""
 
 instance HasColumn "bondtradeagg" (Proxy TradeAggDate) where
   column _ _  = "day"
