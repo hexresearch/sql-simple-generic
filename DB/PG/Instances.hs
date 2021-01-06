@@ -65,10 +65,6 @@ instance ToField Price where
 instance ToField Volume where
   toField (Volume x) = toField (realToFrac x :: Scientific)
 
-
-instance KnownSymbol t => HasTable (From t cols) e where
-  tablename _ _ = fromString (symbolVal (Proxy @t))
-
 instance HasColumn "bondshortname" (Proxy Symbol) where
   column _ _ = "symbol"
 
