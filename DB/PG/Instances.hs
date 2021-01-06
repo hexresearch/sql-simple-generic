@@ -36,10 +36,13 @@ instance FromField Symbol where
   fromField f x = Symbol <$> fromField f x
 
 instance FromField Volume where
-  fromField f x = (Volume <$> realToFrac) <$> fromField f x
+  fromField f x = (Volume <$> realToFrac) <$> (fromField @Scientific f x)
 
 instance FromField BondCouponFreq where
   fromField f x = BondCouponFreq <$> fromField f x
+
+instance FromField BondCouponValue where
+  fromField f x = (BondCouponValue <$> realToFrac) <$> (fromField @Scientific f x)
 
 instance FromField BondIssueDate where
   fromField f x = BondIssueDate <$> fromField f x
@@ -101,6 +104,12 @@ instance HasColumn "bondmatdate" (Proxy Symbol) where
 instance HasColumn "bondmatdate" (Proxy BondMatDate) where
   column _ _ = "value"
 
+instance HasColumn "bondcouponvalue" (Proxy Symbol) where
+  column _ _ = "symbol"
+
+instance HasColumn "bondcouponvalue" (Proxy BondCouponValue) where
+  column _ _ = "value"
+
 newtype TradeAggDate = TradeAggDate Day
                        deriving (Eq,Ord,Show,Data,Generic)
 
@@ -148,3 +157,5 @@ instance HasColumn "vbonddate" (Proxy BondMatDate) where
 instance HasColumn "vbonddate" (Proxy BondCouponFreq) where
   column _ _  = "freq"
 
+instance HasColumn "vbonddate" (Proxy BondCouponValue) where
+  column _ _  = "coupon"
