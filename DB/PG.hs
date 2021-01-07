@@ -102,7 +102,7 @@ instance ( KnownSymbol t
   select eng (Select _ _ (Where p)) = do
     conn <- getConnection eng
     let sql = [qc|select {cols} from {table} where {whereCols};|]
-    print sql
+--     print sql
     query conn sql (boundValues eng (Bound p))
     where
       table = tablename eng (Proxy @(Table t))
