@@ -46,7 +46,6 @@ disposeEngine e = do
 
 data Table (table :: Symbol) = From | Into
 data Rows cols = Rows
-data Row cols = Row
 
 data RecordSet (table :: Symbol) cols = RecordSet
 
@@ -62,7 +61,7 @@ data Returning a = Returning
 
 data Select what from pred = Select what from (Where pred)
 
-data Insert what into values ret = Insert what into values ret
+data Insert into values ret = Insert into values ret
 
 data All a = All
 
@@ -80,11 +79,10 @@ from = From
 into :: Table t
 into = Into
 
+values = Values
+
 returning :: Returning a
 returning = Returning
-
--- returning :: a
--- returning = id
 
 
 instance FromRow () where
@@ -137,30 +135,29 @@ instance ( KnownSymbol t
         Text.intercalate " and " [  [qc|{c} = ?|] | c <- columns (QueryPart @t (Where p)) ]
 
 
-instance KnownSymbol t => HasTable (Insert a (Table t) values r) e where
+instance KnownSymbol t => HasTable (Insert (Table t) values r) e where
   tablename e _ = tablename e (Proxy @(Table t))
 
 -- type family InsertRetVal a :: *
 -- type instance InsertRetVal () =
 
 instance ( KnownSymbol t
-         , HasColumns (TableColumns t row)
          , HasColumns (TableColumns t ret)
+         , HasColumns (TableColumns t values)
          , FromRow ret
          , ToRow values
          , FromRow ret
-         ) => InsertStatement (Insert (Row row) (Table t) (Values values) (Returning ret)) IO PostgreSQLEngine where
-  type InsStatement (Insert (Row row) (Table t) (Values values) (Returning ret)) PostgreSQLEngine = [ret]
-  insert eng st@(Insert _ _ (Values values) _) = do
+         ) => InsertStatement (Insert (Table t) (Values values) (Returning ret)) IO PostgreSQLEngine where
+  type InsStatement (Insert (Table t) (Values values) (Returning ret)) PostgreSQLEngine = [ret]
+  insert eng st@(Insert _ (Values values) _) = do
     conn <- getConnection eng
     let sql = [qc|insert into {table} {colDef} {valDef} returning {retColDef}|]
---     let sql = [qc|insert into {table} {colDef} {valDef}|]
     print sql
     query conn sql values
     where
       table = tablename eng st
       retColNames = columns (TableColumns :: TableColumns t ret)
-      colNames = columns (TableColumns :: TableColumns t row)
+      colNames = columns (TableColumns :: TableColumns t values)
       cols     = Text.intercalate "," colNames
       retCols  = Text.intercalate "," retColNames
       binds    = Text.intercalate "," [ "?" | x <- colNames ]
