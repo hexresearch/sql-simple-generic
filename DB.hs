@@ -36,5 +36,5 @@ class HasConnection e m where
   getConnection :: e -> m (DbConnection e)
 
 class HasTransaction e m where
-  transaction :: e -> m () -> m ()
+  transaction :: e -> m a -> m a
 

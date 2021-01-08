@@ -71,6 +71,9 @@ instance ToField Price where
 instance ToField Volume where
   toField (Volume x) = toField (realToFrac x :: Scientific)
 
+instance ToField Qty where
+  toField = toField . Newtype.unpack
+
 instance HasColumn "bondshortname" (Proxy Symbol) where
   column _ _ = "symbol"
 
@@ -159,3 +162,29 @@ instance HasColumn "vbonddate" (Proxy BondCouponFreq) where
 
 instance HasColumn "vbonddate" (Proxy BondCouponValue) where
   column _ _  = "coupon"
+
+
+instance HasColumn "bondportfolio" (Proxy BondPortfolioId) where
+  column _ _ = "id"
+
+instance FromRow BondPortfolioId where
+  fromRow = BondPortfolioId <$> field
+
+instance FromField BondPortfolioId where
+  fromField f x = BondPortfolioId <$> fromField f x
+
+instance ToField BondPortfolioId where
+  toField (BondPortfolioId x) = toField x
+
+instance HasColumn "bondportfolioposition" (Proxy BondPortfolioId) where
+  column _ _ = "portfolioid"
+
+instance HasColumn "bondportfolioposition" (Proxy Symbol) where
+  column _ _ = "symbol"
+
+instance HasColumn "bondportfolioposition" (Proxy Qty) where
+  column _ _ = "qty"
+
+
+
+

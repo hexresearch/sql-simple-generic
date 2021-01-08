@@ -5,6 +5,7 @@ module DB.PG ( module DB
              ) where
 
 import Database.PostgreSQL.Simple
+import Database.PostgreSQL.Simple.FromRow
 import Data.ByteString (ByteString)
 import Data.Proxy
 import Data.String (IsString(..))
@@ -14,6 +15,7 @@ import qualified Data.Text as Text
 import Text.InterpolatedString.Perl6 (qc)
 
 import DB
+
 
 class PostgreSQLEngineAttributes a where
   connectionString :: a -> ByteString
@@ -42,20 +44,30 @@ disposeEngine e = do
   conn <- getConnection e
   close conn
 
-data Table (table :: Symbol) = From
+data Table (table :: Symbol) = From | Into
 data Rows cols = Rows
+data Row cols = Row
 
 data RecordSet (table :: Symbol) cols = RecordSet
 
 data QueryPart (table :: Symbol) pred = QueryPart pred
 
+data TableColumns (table :: Symbol) cols = TableColumns
+
 data Where p = Where p
 
+data Values p = Values p
+
+data Returning a = Returning
+
 data Select what from pred = Select what from (Where pred)
+
+data Insert what into values ret = Insert what into values ret
 
 data All a = All
 
 data Pred a = Eq a
+
 
 newtype Bound a = Bound a
 
@@ -64,6 +76,19 @@ rows = Rows
 
 from :: Table t
 from = From
+
+into :: Table t
+into = Into
+
+returning :: Returning a
+returning = Returning
+
+-- returning :: a
+-- returning = id
+
+
+instance FromRow () where
+  fromRow = (field :: (RowParser (Maybe Int)) ) >> pure ()
 
 class SQLQueryPart t p where
   sqlFrom :: QueryPart t p -> Text
@@ -111,7 +136,110 @@ instance ( KnownSymbol t
       whereCols =
         Text.intercalate " and " [  [qc|{c} = ?|] | c <- columns (QueryPart @t (Where p)) ]
 
-instance (KnownSymbol t, HasColumn t (Proxy p)) => HasColumns (QueryPart t (Where p)) where
+
+instance KnownSymbol t => HasTable (Insert a (Table t) values r) e where
+  tablename e _ = tablename e (Proxy @(Table t))
+
+-- type family InsertRetVal a :: *
+-- type instance InsertRetVal () =
+
+instance ( KnownSymbol t
+         , HasColumns (TableColumns t row)
+         , HasColumns (TableColumns t ret)
+         , FromRow ret
+         , ToRow values
+         , FromRow ret
+         ) => InsertStatement (Insert (Row row) (Table t) (Values values) (Returning ret)) IO PostgreSQLEngine where
+  type InsStatement (Insert (Row row) (Table t) (Values values) (Returning ret)) PostgreSQLEngine = [ret]
+  insert eng st@(Insert _ _ (Values values) _) = do
+    conn <- getConnection eng
+    let sql = [qc|insert into {table} {colDef} {valDef} returning {retColDef}|]
+--     let sql = [qc|insert into {table} {colDef} {valDef}|]
+    print sql
+    query conn sql values
+    where
+      table = tablename eng st
+      retColNames = columns (TableColumns :: TableColumns t ret)
+      colNames = columns (TableColumns :: TableColumns t row)
+      cols     = Text.intercalate "," colNames
+      retCols  = Text.intercalate "," retColNames
+      binds    = Text.intercalate "," [ "?" | x <- colNames ]
+
+      retColDef :: Text
+      retColDef = case retColNames of
+        [] -> "null"
+        _  -> retCols
+
+      colDef :: Text
+      colDef = case colNames of
+        [] -> ""
+        _  -> [qc|({cols})|]
+
+      valDef :: Text
+      valDef = case colNames of
+        [] -> "default values"
+        _  -> [qc|values({binds})|]
+
+
+
+-- instance (KnownSymbol t, HasColumn t (Proxy a), HasColumn t (Proxy b)) => HasColumns (TableColumns t (a,b)) where
+--   columns _ = error "FUCK! FUCK!"
+
+-- instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (TableColumns t (Proxy a)) where
+--   columns = const [ column (Proxy @t) (Proxy @a) ]
+
+instance {-# OVERLAPPING #-} (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (TableColumns t a) where
+  columns = const [ column (Proxy @t) (Proxy @a) ]
+
+instance {-# OVERLAPPING #-} (KnownSymbol t) => HasColumns (TableColumns t ()) where
+  columns = const []
+
+instance {-# OVERLAPPING #-}
+         ( KnownSymbol t
+         , HasColumn t (Proxy a1)
+         , HasColumn t (Proxy a2)
+         ) => HasColumns (TableColumns t (a1,a2)) where
+  columns = const [ column (Proxy @t) (Proxy @a1)
+                  , column (Proxy @t) (Proxy @a2)
+                  ]
+
+instance  {-# OVERLAPPING #-} ( KnownSymbol t
+         , HasColumn t (Proxy a1)
+         , HasColumn t (Proxy a2)
+         , HasColumn t (Proxy a3)
+         ) => HasColumns (TableColumns t (a1,a2,a3)) where
+  columns = const [ column (Proxy @t) (Proxy @a1)
+                  , column (Proxy @t) (Proxy @a2)
+                  , column (Proxy @t) (Proxy @a3)
+                  ]
+
+instance  {-# OVERLAPPING #-} ( KnownSymbol t
+         , HasColumn t (Proxy a1)
+         , HasColumn t (Proxy a2)
+         , HasColumn t (Proxy a3)
+         , HasColumn t (Proxy a4)
+         ) => HasColumns (TableColumns t (a1,a2,a3,a4)) where
+  columns = const [ column (Proxy @t) (Proxy @a1)
+                  , column (Proxy @t) (Proxy @a2)
+                  , column (Proxy @t) (Proxy @a3)
+                  , column (Proxy @t) (Proxy @a4)
+                  ]
+
+instance {-# OVERLAPPING #-} ( KnownSymbol t
+         , HasColumn t (Proxy a1)
+         , HasColumn t (Proxy a2)
+         , HasColumn t (Proxy a3)
+         , HasColumn t (Proxy a4)
+         , HasColumn t (Proxy a5)
+         ) => HasColumns (TableColumns t (a1,a2,a3,a4,a5)) where
+  columns = const [ column (Proxy @t) (Proxy @a1)
+                  , column (Proxy @t) (Proxy @a2)
+                  , column (Proxy @t) (Proxy @a3)
+                  , column (Proxy @t) (Proxy @a4)
+                  , column (Proxy @t) (Proxy @a5)
+                  ]
+
+instance {-# OVERLAPPING #-} (KnownSymbol t, HasColumn t (Proxy p)) => HasColumns (QueryPart t (Where p)) where
   columns = const [ column (Proxy @t) (Proxy @p) ]
 
 instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
@@ -141,7 +269,6 @@ instance ( HasColumn t (Proxy a1)
                   , column (Proxy @t) (Proxy @a2)
                   , column (Proxy @t) (Proxy @a3)
                   ]
-
 
 instance ( HasColumn t (Proxy a1)
          , HasColumn t (Proxy a2)
