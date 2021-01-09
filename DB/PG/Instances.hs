@@ -194,6 +194,21 @@ instance HasColumn "bondportfolioposition" (Proxy Qty) where
 instance FromField BondPortfolioUUID where
   fromField t x = BondPortfolioUUID <$> fromField t x
 
+instance ToField BondPortfolioUUID where
+  toField  = toField . Newtype.unpack
+
+instance FromRow BondPortfolioUUID where
+  fromRow = BondPortfolioUUID <$> field
+
+instance FromField BondCouponPayment where
+  fromField t x = (BondCouponPayment . realToFrac) <$> (fromField @Scientific t x)
+
+instance ToField BondCouponPayment where
+  toField  = toField . realToFrac . Newtype.unpack
+
+instance FromRow BondCouponPayment where
+  fromRow = (BondCouponPayment . realToFrac) <$> field
+
 instance HasColumn "bondportfolio" (Proxy BondPortfolioUUID) where
   column _ _ = "uuid"
 
@@ -204,6 +219,34 @@ instance HasColumn "bondportfolioname" (Proxy BondPortfolioId) where
 instance HasColumn "bondportfolioname" (Proxy BondPortfolioName) where
   column _ _ = "name"
 
+-- vbondportfoliodates
+
+instance HasColumn "vbondportfoliodates" (Proxy BondPortfolioId) where
+  column _ _ = "portfolioid"
+
+instance HasColumn "vbondportfoliodates" (Proxy BondPortfolioUUID) where
+  column _ _ = "portfoliouuid"
+
+instance HasColumn "vbondportfoliodates" (Proxy Symbol) where
+  column _ _ = "symbol"
+
+instance HasColumn "vbondportfoliodates" (Proxy Qty) where
+  column _ _ = "qty"
+
+instance HasColumn "vbondportfoliodates" (Proxy BondIssueDate) where
+  column _ _ = "issuedate"
+
+instance HasColumn "vbondportfoliodates" (Proxy BondMatDate) where
+  column _ _ = "matdate"
+
+instance HasColumn "vbondportfoliodates" (Proxy BondCouponFreq) where
+  column _ _ = "freq"
+
+instance HasColumn "vbondportfoliodates" (Proxy BondCouponValue) where
+  column _ _ = "coupon"
+
+instance HasColumn "vbondportfoliodates" (Proxy BondCouponPayment) where
+  column _ _ = "payment"
 
 
 
