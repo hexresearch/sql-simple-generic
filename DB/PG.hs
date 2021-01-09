@@ -12,6 +12,7 @@ import Data.Proxy
 import Data.String (IsString(..))
 import Data.Text (Text)
 import GHC.TypeLits
+import qualified Data.List as List
 import qualified Data.Text as Text
 import Text.InterpolatedString.Perl6 (qc)
 
@@ -97,10 +98,6 @@ instance FromRow () where
 class SQLQueryPart t p where
   sqlFrom :: QueryPart t p -> Text
 
-class HasBoundValues a e where
-  type BoundValues a e :: *
-  boundValues :: e -> a -> BoundValues a e
-
 instance KnownSymbol t => HasTable (RecordSet t cols) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))
 
@@ -122,23 +119,24 @@ instance ( KnownSymbol t
 
 instance ( KnownSymbol t
          , HasColumns (RecordSet t [row])
-         , HasColumns (QueryPart t (Where pred))
+         , HasColumns (QueryPart t pred)
          , FromRow row
-         , HasBoundValues (Bound pred) PostgreSQLEngine
-         , ToRow (BoundValues (Bound pred) PostgreSQLEngine)
+         , HasBindValueList pred
          ) => SelectStatement (Select (Rows [row]) (Table t) pred) IO PostgreSQLEngine where
   type SelectResult (Select (Rows [row]) (Table t) pred) = [row]
-  select eng (Select _ _ (Where p)) = do
+  select eng (Select _ _ (Where foo)) = do
     conn <- getConnection eng
-    let sql = [qc|select {cols} from {table} where {whereCols};|]
---     print sql
-    query conn sql (boundValues eng (Bound p))
+    let sql = [qc|select {cols} from {table} where {whereCols}|]
+    print sql
+    query conn sql binds
     where
+      binds = bindValueList foo
       table = tablename eng (Proxy @(Table t))
       cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
       whereCols :: Text.Text
-      whereCols =
-        Text.intercalate " and " [  [qc|{c} = ?|] | c <- columns (QueryPart @t (Where p)) ]
+      whereCols | List.null binds = "true"
+                | otherwise  =
+        Text.intercalate " and " [  [qc|{c} = ?|] | c <- columns (QueryPart @t foo) ]
 
 
 instance KnownSymbol t => HasTable (Insert (Table t) values r) e where
@@ -191,6 +189,9 @@ class HasBindValueList a where
 
 instance {-# OVERLAPPABLE #-}  ToField a => HasBindValueList a where
   bindValueList a = [ToRowItem a]
+
+instance HasBindValueList () where
+  bindValueList = const mempty
 
 instance ( ToField a1
          , ToField a2
@@ -342,17 +343,26 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
                   , column (Proxy @t) (Proxy @a5)
                   ]
 
-instance {-# OVERLAPPING #-} (KnownSymbol t, HasColumn t (Proxy p)) => HasColumns (QueryPart t (Where p)) where
-  columns = const [ column (Proxy @t) (Proxy @p) ]
 
 instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
   tablename _ _ = fromString $ symbolVal (Proxy @t)
 
 
-instance ( HasColumn t (Proxy a)
-         , KnownSymbol t
-         ) => HasColumns (QueryPart t [(a,b)])   where
+instance {-# OVERLAPPABLE #-}
+         ( KnownSymbol t, HasColumn t (Proxy a)
+         ) => HasColumns (QueryPart t a) where
   columns = const [ column (Proxy @t) (Proxy @a)
+                  ]
+
+instance {-# OVERLAPPING #-} KnownSymbol t => HasColumns (QueryPart t ()) where
+  columns = const mempty
+
+instance ( HasColumn t (Proxy a1)
+         , HasColumn t (Proxy a2)
+         , KnownSymbol t
+         ) => HasColumns (QueryPart t (a1,a2))   where
+  columns = const [ column (Proxy @t) (Proxy @a1)
+                  , column (Proxy @t) (Proxy @a2)
                   ]
 
 instance {-# OVERLAPPABLE #-}( HasColumn t (Proxy a)
@@ -409,8 +419,4 @@ instance ( HasColumn t (Proxy a1)
                   , column (Proxy @t) (Proxy @a5)
                   ]
 
-
-instance HasBoundValues (Bound a) PostgreSQLEngine where
-  type BoundValues (Bound a) PostgreSQLEngine = Only a
-  boundValues _ (Bound x) = Only x
 
