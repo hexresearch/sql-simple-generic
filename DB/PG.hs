@@ -47,6 +47,13 @@ disposeEngine e = do
   conn <- getConnection e
   close conn
 
+withEngine :: PostgreSQLEngineAttributes a => a -> (PostgreSQLEngine -> IO b) -> IO b
+withEngine ea m = do
+  e <- createEngine ea
+  r <- m e
+  disposeEngine e
+  pure r
+
 data Table (table :: Symbol) = From | Into
 data Rows cols = Rows
 
@@ -114,7 +121,7 @@ instance ( KnownSymbol t
   select eng (Select _ _ (Where foo)) = do
     conn <- getConnection eng
     let sql = [qc|select {cols} from {table} where {whereCols}|]
-    print sql
+--     print sql
     query conn sql binds
     where
       binds = bindValueList foo
@@ -134,7 +141,7 @@ instance ( KnownSymbol t
   delete eng (Delete _ (Where foo)) = do
     conn <- getConnection eng
     let sql = [qc|delete from {table} where {whereCols}|]
-    print sql
+--     print sql
     execute conn sql binds
     where
       binds = bindValueList foo
@@ -251,7 +258,7 @@ instance ( KnownSymbol t
   type IoRStatement (Insert (Table t) (KeyValues k v ) (Returning ret)) PostgreSQLEngine = [ret]
   insertOrReplace eng st@(Insert _ (KeyValues k v) _) = do
     conn <- getConnection eng
-    print sql
+--     print sql
     query conn sql (bindValueList (KeyValues k v))
     where
       sql = [qc|

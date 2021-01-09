@@ -179,6 +179,9 @@ instance FromField BondPortfolioId where
 instance ToField BondPortfolioId where
   toField (BondPortfolioId x) = toField x
 
+instance ToField BondPortfolioName where
+  toField (BondPortfolioName x) = toField x
+
 instance HasColumn "bondportfolioposition" (Proxy BondPortfolioId) where
   column _ _ = "portfolioid"
 
@@ -187,4 +190,22 @@ instance HasColumn "bondportfolioposition" (Proxy Symbol) where
 
 instance HasColumn "bondportfolioposition" (Proxy Qty) where
   column _ _ = "qty"
+
+instance FromField BondPortfolioUUID where
+  fromField t x = BondPortfolioUUID <$> fromField t x
+
+instance HasColumn "bondportfolio" (Proxy BondPortfolioUUID) where
+  column _ _ = "uuid"
+
+
+instance HasColumn "bondportfolioname" (Proxy BondPortfolioId) where
+  column _ _ = "portfolioid"
+
+instance HasColumn "bondportfolioname" (Proxy BondPortfolioName) where
+  column _ _ = "name"
+
+
+
+
+
 
