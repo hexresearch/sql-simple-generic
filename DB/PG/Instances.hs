@@ -74,6 +74,9 @@ instance ToField Volume where
 instance ToField Qty where
   toField = toField . Newtype.unpack
 
+instance FromField Qty where
+  fromField f x  = Newtype.pack <$> fromField f x
+
 instance HasColumn "bondshortname" (Proxy Symbol) where
   column _ _ = "symbol"
 

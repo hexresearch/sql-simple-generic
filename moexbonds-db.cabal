@@ -22,16 +22,17 @@ common shared-properties
                      , DeriveDataTypeable
                      , DeriveGeneric
                      , DerivingStrategies
-                     , FlexibleInstances
                      , FlexibleContexts
+                     , FlexibleInstances
                      , FunctionalDependencies
+                     , GADTs
+                     , GeneralizedNewtypeDeriving
                      , MultiParamTypeClasses
                      , OverloadedStrings
                      , RecordWildCards
                      , ScopedTypeVariables
-                     , TypeFamilies
-                     , GeneralizedNewtypeDeriving
                      , TypeApplications
+                     , TypeFamilies
 
 library
   import: shared-properties

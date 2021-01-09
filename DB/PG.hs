@@ -6,6 +6,7 @@ module DB.PG ( module DB
 
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromRow
+import Database.PostgreSQL.Simple.ToField
 import Data.ByteString (ByteString)
 import Data.Proxy
 import Data.String (IsString(..))
@@ -57,6 +58,8 @@ data Where p = Where p
 
 data Values p = Values p
 
+data KeyValues k v = KeyValues k v
+
 data Returning a = Returning
 
 data Select what from pred = Select what from (Where pred)
@@ -80,6 +83,9 @@ into :: Table t
 into = Into
 
 values = Values
+
+keyValues :: a -> b -> KeyValues a b
+keyValues = KeyValues
 
 returning :: Returning a
 returning = Returning
@@ -138,9 +144,6 @@ instance ( KnownSymbol t
 instance KnownSymbol t => HasTable (Insert (Table t) values r) e where
   tablename e _ = tablename e (Proxy @(Table t))
 
--- type family InsertRetVal a :: *
--- type instance InsertRetVal () =
-
 instance ( KnownSymbol t
          , HasColumns (TableColumns t ret)
          , HasColumns (TableColumns t values)
@@ -152,7 +155,7 @@ instance ( KnownSymbol t
   insert eng st@(Insert _ (Values values) _) = do
     conn <- getConnection eng
     let sql = [qc|insert into {table} {colDef} {valDef} returning {retColDef}|]
-    print sql
+--     print sql
     query conn sql values
     where
       table = tablename eng st
@@ -178,11 +181,115 @@ instance ( KnownSymbol t
         _  -> [qc|values({binds})|]
 
 
--- instance (KnownSymbol t, HasColumn t (Proxy a), HasColumn t (Proxy b)) => HasColumns (TableColumns t (a,b)) where
---   columns _ = error "FUCK! FUCK!"
+data ToRowItem = forall a . ToField a => ToRowItem a
 
--- instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (TableColumns t (Proxy a)) where
---   columns = const [ column (Proxy @t) (Proxy @a) ]
+instance ToField ToRowItem where
+  toField (ToRowItem x) = toField x
+
+class HasBindValueList a where
+  bindValueList :: a -> [ToRowItem]
+
+instance {-# OVERLAPPABLE #-}  ToField a => HasBindValueList a where
+  bindValueList a = [ToRowItem a]
+
+instance ( ToField a1
+         , ToField a2
+         ) => HasBindValueList (a1,a2) where
+  bindValueList (a1,a2) = bindValueList a1 <> bindValueList a2
+
+instance ( ToField a1
+         , ToField a2
+         , ToField a3
+         ) => HasBindValueList (a1,a2,a3) where
+  bindValueList (a1,a2,a3) =    bindValueList a1
+                             <> bindValueList a2
+                             <> bindValueList a3
+
+instance ( ToField a1
+         , ToField a2
+         , ToField a3
+         , ToField a4
+         ) => HasBindValueList (a1,a2,a3,a4) where
+  bindValueList (a1,a2,a3,a4) =    bindValueList a1
+                                <> bindValueList a2
+                                <> bindValueList a3
+                                <> bindValueList a4
+
+instance ( ToField a1
+         , ToField a2
+         , ToField a3
+         , ToField a4
+         , ToField a5
+         ) => HasBindValueList (a1,a2,a3,a4,a5) where
+  bindValueList (a1,a2,a3,a4,a5) =   bindValueList a1
+                                  <> bindValueList a2
+                                  <> bindValueList a3
+                                  <> bindValueList a4
+                                  <> bindValueList a5
+
+instance (HasBindValueList a, HasBindValueList b) => HasBindValueList (KeyValues a b) where
+  bindValueList (KeyValues a b) = bindValueList a <> bindValueList b
+
+instance (HasBindValueList a) => HasBindValueList (Where a) where
+  bindValueList (Where x) = bindValueList x
+
+instance ( KnownSymbol t
+         , HasColumns (TableColumns t ret)
+         , HasColumns (TableColumns t k)
+         , HasColumns (TableColumns t v)
+         , HasBindValueList (KeyValues k v)
+         , FromRow ret
+         ) =>
+  InsertOrReplaceStatement (Insert (Table t) (KeyValues k v) (Returning ret)) IO PostgreSQLEngine where
+  type IoRStatement (Insert (Table t) (KeyValues k v ) (Returning ret)) PostgreSQLEngine = [ret]
+  insertOrReplace eng st@(Insert _ (KeyValues k v) _) = do
+    conn <- getConnection eng
+    print sql
+    query conn sql (bindValueList (KeyValues k v))
+    where
+      sql = [qc|
+insert into {table} {colDef} {valDef}
+{onconflict}
+returning {retColDef}
+|]
+      table = tablename eng st
+
+      colNames = colsK <> colsV
+
+      colDef :: Text
+      colDef   = case colsList colNames of
+                   "" -> ""
+                   x  -> [qc|({x})|]
+
+      onconflict :: Text
+      onconflict = case (colsK, colsV) of
+        ((x:xs),[])     -> "on conflict do ignore"
+        ((x:[]),ys)     -> [qc|on conflict {x} do update set {updVals}|]
+        ((x:xs),(y:ys)) -> [qc|on conflict ({colsList colsK}) do update set {updVals}|]
+        (_,_)           -> ""
+
+      colsList = Text.intercalate ","
+
+      updVals = colsList [ [qc|{v} = excluded.{v}|] | v <- colsV ]
+
+      retColNames = columns (TableColumns :: TableColumns t ret)
+
+      colsK  = columns (TableColumns :: TableColumns t k)
+      colsV =  columns (TableColumns :: TableColumns t v)
+
+      retCols  = colsList retColNames
+      binds    = colsList [ "?" | x <- colNames ]
+
+      retColDef :: Text
+      retColDef = case retColNames of
+        [] -> "null"
+        _  -> retCols
+
+      valDef :: Text
+      valDef = case colNames of
+        [] -> "default values"
+        _  -> [qc|values({binds})|]
+
 
 instance {-# OVERLAPPING #-} (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (TableColumns t a) where
   columns = const [ column (Proxy @t) (Proxy @a) ]
@@ -241,9 +348,16 @@ instance {-# OVERLAPPING #-} (KnownSymbol t, HasColumn t (Proxy p)) => HasColumn
 instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
   tablename _ _ = fromString $ symbolVal (Proxy @t)
 
+
 instance ( HasColumn t (Proxy a)
          , KnownSymbol t
          ) => HasColumns (QueryPart t [(a,b)])   where
+  columns = const [ column (Proxy @t) (Proxy @a)
+                  ]
+
+instance {-# OVERLAPPABLE #-}( HasColumn t (Proxy a)
+         , KnownSymbol t
+         ) => HasColumns (RecordSet t [a]) where
   columns = const [ column (Proxy @t) (Proxy @a)
                   ]
 
