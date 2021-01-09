@@ -8,6 +8,7 @@ import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple.ToField
 import Data.ByteString (ByteString)
+import Data.Int
 import Data.Proxy
 import Data.String (IsString(..))
 import Data.Text (Text)
@@ -67,6 +68,8 @@ data Select what from pred = Select what from (Where pred)
 
 data Insert into values ret = Insert into values ret
 
+data Delete what pred = Delete what pred
+
 data All a = All
 
 data Pred a = Eq a
@@ -95,27 +98,11 @@ returning = Returning
 instance FromRow () where
   fromRow = (field :: (RowParser (Maybe Int)) ) >> pure ()
 
-class SQLQueryPart t p where
-  sqlFrom :: QueryPart t p -> Text
-
 instance KnownSymbol t => HasTable (RecordSet t cols) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))
 
 instance KnownSymbol t => HasTable (Proxy (Table t)) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))
-
-instance ( KnownSymbol t
-         , HasTable   (RecordSet t [row]) PostgreSQLEngine
-         , HasColumns (RecordSet t [row])
-         , FromRow row
-         ) => SelectStatement (All (RecordSet t [row])) IO PostgreSQLEngine
-      where
-        type SelectResult (All (RecordSet t [row])) = [row]
-        select eng q = do
-          conn <- getConnection eng
-          query_ conn [qc|select {cols} from {table}|]
-          where table = tablename eng q
-                cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
 
 instance ( KnownSymbol t
          , HasColumns (RecordSet t [row])
@@ -133,6 +120,25 @@ instance ( KnownSymbol t
       binds = bindValueList foo
       table = tablename eng (Proxy @(Table t))
       cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
+      whereCols :: Text.Text
+      whereCols | List.null binds = "true"
+                | otherwise  =
+        Text.intercalate " and " [  [qc|{c} = ?|] | c <- columns (QueryPart @t foo) ]
+
+
+instance ( KnownSymbol t
+         , HasColumns (QueryPart t pred)
+         , HasBindValueList pred
+         ) => DeleteStatement (Delete (Table t) (Where pred)) IO PostgreSQLEngine where
+  type DeleteResult (Delete (Table t) (Where pred)) = Int64
+  delete eng (Delete _ (Where foo)) = do
+    conn <- getConnection eng
+    let sql = [qc|delete from {table} where {whereCols}|]
+    print sql
+    execute conn sql binds
+    where
+      binds = bindValueList foo
+      table = tablename eng (Proxy @(Table t))
       whereCols :: Text.Text
       whereCols | List.null binds = "true"
                 | otherwise  =

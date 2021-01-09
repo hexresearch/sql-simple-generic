@@ -31,6 +31,10 @@ class SelectStatement q m e where
   type SelectResult q :: *
   select :: e -> q -> m (SelectResult q)
 
+class DeleteStatement q m e where
+  type DeleteResult q :: *
+  delete :: e -> q -> m (DeleteResult q)
+
 class HasConnection e m where
   type DbConnection e :: *
   getConnection :: e -> m (DbConnection e)
