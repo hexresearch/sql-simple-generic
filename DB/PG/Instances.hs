@@ -185,6 +185,3 @@ instance HasColumn "bondportfolioposition" (Proxy Symbol) where
 instance HasColumn "bondportfolioposition" (Proxy Qty) where
   column _ _ = "qty"
 
-
-
-

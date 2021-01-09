@@ -178,7 +178,6 @@ instance ( KnownSymbol t
         _  -> [qc|values({binds})|]
 
 
-
 -- instance (KnownSymbol t, HasColumn t (Proxy a), HasColumn t (Proxy b)) => HasColumns (TableColumns t (a,b)) where
 --   columns _ = error "FUCK! FUCK!"
 
