@@ -4,8 +4,8 @@ module DB.PG ( module DB
              , module DB.PG
              ) where
 
-import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromRow
+import Database.PostgreSQL.Simple hiding (In)
 import Database.PostgreSQL.Simple.ToField
 import Data.ByteString (ByteString)
 import Data.Int
@@ -13,6 +13,7 @@ import Data.Proxy
 import Data.String (IsString(..))
 import Data.Text (Text)
 import GHC.TypeLits
+import qualified Database.PostgreSQL.Simple as PgSimple
 import qualified Data.List as List
 import qualified Data.Text as Text
 import Text.InterpolatedString.Perl6 (qc)
@@ -57,6 +58,7 @@ withEngine ea m = do
 data Table (table :: Symbol) = From | Into
 data Rows cols = Rows
 
+
 data RecordSet (table :: Symbol) cols = RecordSet
 
 data QueryPart (table :: Symbol) pred = QueryPart pred
@@ -80,7 +82,6 @@ data Delete what pred = Delete what pred
 data All a = All
 
 data Pred a = Eq a
-
 
 newtype Bound a = Bound a
 
