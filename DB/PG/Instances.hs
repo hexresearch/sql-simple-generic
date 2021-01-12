@@ -44,6 +44,12 @@ instance FromField BondCouponFreq where
 instance FromField BondCouponValue where
   fromField f x = (BondCouponValue <$> realToFrac) <$> (fromField @Scientific f x)
 
+instance FromField BondCouponPercent where
+  fromField f x = (BondCouponPercent <$> realToFrac) <$> (fromField @Scientific f x)
+
+instance ToText BondCouponPercent where
+  toText = toText . show . Newtype.unpack
+
 instance FromField BondIssueDate where
   fromField f x = BondIssueDate <$> fromField f x
 
@@ -166,6 +172,8 @@ instance HasColumn "vbonddate" (Proxy BondCouponFreq) where
 instance HasColumn "vbonddate" (Proxy BondCouponValue) where
   column _ _  = "coupon"
 
+instance HasColumn "vbonddate" (Proxy BondShortName) where
+  column _ _  = "shortname"
 
 instance HasColumn "bondportfolio" (Proxy BondPortfolioId) where
   column _ _ = "id"
@@ -249,6 +257,30 @@ instance HasColumn "vbondportfoliodates" (Proxy BondCouponPayment) where
   column _ _ = "payment"
 
 
+instance HasColumn "vbondinfo" (Proxy Symbol) where
+  column _ _  = "symbol"
 
+instance HasColumn "vbondinfo" (Proxy BondIssueDate) where
+  column _ _  = "issuedate"
 
+instance HasColumn "vbondinfo" (Proxy BondMatDate) where
+  column _ _  = "matdate"
+
+instance HasColumn "vbondinfo" (Proxy BondCouponFreq) where
+  column _ _  = "freq"
+
+instance HasColumn "vbondinfo" (Proxy BondCouponValue) where
+  column _ _  = "coupon"
+
+instance HasColumn "vbondinfo" (Proxy BondCouponPercent) where
+  column _ _  = "coupon_percent"
+
+instance HasColumn "vbondinfo" (Proxy BondCurrency) where
+  column _ _  = "currency"
+
+instance HasColumn "vbondinfo" (Proxy BondShortName) where
+  column _ _  = "shortname"
+
+instance HasColumn "vbondinfo" (Proxy BondFullName) where
+  column _ _  = "fullname"
 
