@@ -36,7 +36,7 @@ instance FromField Symbol where
   fromField f x = Symbol <$> fromField f x
 
 instance FromField Volume where
-  fromField f x = (Volume <$> realToFrac) <$> (fromField @Scientific f x)
+  fromField f x = Volume <$> fromField f x
 
 instance FromField BondCouponFreq where
   fromField f x = BondCouponFreq <$> fromField f x
@@ -130,10 +130,10 @@ instance Newtype TradeAggDate Day
 instance ToText TradeAggDate where
   toText = toText . Newtype.unpack
 
-newtype TradeAggVol  = TradeAggVol (Maybe Scientific)
+newtype TradeAggVol  = TradeAggVol (Maybe Integer)
                        deriving (Eq,Ord,Show,Data,Generic)
 
-instance Newtype TradeAggVol (Maybe Scientific)
+instance Newtype TradeAggVol (Maybe Integer)
 
 instance ToText TradeAggVol where
   toText (TradeAggVol (Just x))  = toText (show x)
@@ -283,4 +283,21 @@ instance HasColumn "vbondinfo" (Proxy BondShortName) where
 
 instance HasColumn "vbondinfo" (Proxy BondFullName) where
   column _ _  = "fullname"
+
+instance HasColumn "bondcoupondate" (Proxy Symbol) where
+  column _ _  = "symbol"
+
+instance HasColumn "bondcoupondate" (Proxy BondCouponDate) where
+  column _ _  = "day"
+
+
+instance FromField BondCouponDate where
+  fromField f x = BondCouponDate <$> fromField f x
+
+instance ToField BondCouponDate where
+  toField x = toField (Newtype.unpack x)
+
+instance FromRow BondCouponDate where
+  fromRow = BondCouponDate <$> field
+
 

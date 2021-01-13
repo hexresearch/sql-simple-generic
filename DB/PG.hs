@@ -278,7 +278,7 @@ returning {retColDef}
 
       onconflict :: Text
       onconflict = case (colsK, colsV) of
-        ((x:xs),[])     -> "on conflict do ignore"
+        ((x:xs),[])     -> [qc|on conflict ({colsList colsK}) do nothing|]
         ((x:[]),ys)     -> [qc|on conflict {x} do update set {updVals}|]
         ((x:xs),(y:ys)) -> [qc|on conflict ({colsList colsK}) do update set {updVals}|]
         (_,_)           -> ""
