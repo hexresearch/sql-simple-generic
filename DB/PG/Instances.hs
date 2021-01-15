@@ -190,6 +190,9 @@ instance ToField BondPortfolioId where
 instance ToField BondPortfolioName where
   toField (BondPortfolioName x) = toField x
 
+instance FromField BondPortfolioName where
+  fromField f x = BondPortfolioName <$> fromField f x
+
 instance HasColumn "bondportfolioposition" (Proxy BondPortfolioId) where
   column _ _ = "portfolioid"
 
@@ -299,5 +302,13 @@ instance ToField BondCouponDate where
 
 instance FromRow BondCouponDate where
   fromRow = BondCouponDate <$> field
+
+
+-- vbondportfolio
+instance HasColumn "vbondportfolio" (Proxy BondPortfolioUUID) where
+  column _ _ = "uuid"
+
+instance HasColumn "vbondportfolio" (Proxy BondPortfolioName) where
+  column _ _ = "name"
 
 
