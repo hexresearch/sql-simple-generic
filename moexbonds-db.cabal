@@ -31,6 +31,7 @@ common shared-properties
                      , OverloadedStrings
                      , RecordWildCards
                      , ScopedTypeVariables
+                     , StandaloneDeriving
                      , TypeApplications
                      , TypeFamilies
 

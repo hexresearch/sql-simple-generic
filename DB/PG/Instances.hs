@@ -29,17 +29,54 @@ instance ToText Day where
 instance FromRow Symbol where
   fromRow = Symbol <$> field
 
-instance ToField Symbol where
-  toField x = toField (Newtype.unpack x)
+deriving newtype instance ToField Symbol
+deriving newtype instance FromField Symbol
 
-instance FromField Symbol where
-  fromField f x = Symbol <$> fromField f x
+deriving newtype instance ToField Volume
+deriving newtype instance FromField Volume
 
-instance FromField Volume where
-  fromField f x = Volume <$> fromField f x
+deriving newtype instance FromField BondCouponFreq
+deriving newtype instance ToField BondCouponFreq
 
-instance FromField BondCouponFreq where
-  fromField f x = BondCouponFreq <$> fromField f x
+deriving newtype instance FromField  BondIssueDate
+deriving newtype instance ToField  BondIssueDate
+
+deriving newtype instance FromField BondMatDate
+deriving newtype instance ToField BondMatDate
+
+deriving newtype instance FromField BondShortName
+deriving newtype instance ToField BondShortName
+
+deriving newtype instance FromField BondFullName
+deriving newtype instance ToField BondFullName
+
+deriving newtype instance FromField TradeAggDate
+deriving newtype instance ToField TradeAggDate
+
+deriving newtype instance FromField TradeAggVol
+deriving newtype instance ToField TradeAggVol
+
+deriving newtype instance ToField Market
+deriving newtype instance FromField Market
+
+deriving newtype instance ToField Qty
+deriving newtype instance FromField Qty
+
+deriving newtype instance FromField BondPortfolioId
+deriving newtype instance ToField BondPortfolioId
+
+deriving newtype instance FromField BondPortfolioUUID
+deriving newtype instance ToField BondPortfolioUUID
+
+deriving newtype instance FromField BondCouponDate
+deriving newtype instance ToField BondCouponDate
+
+instance ToField BondPortfolioName where
+  toField (BondPortfolioName x) = toField x
+
+instance FromField BondPortfolioName where
+  fromField f x = BondPortfolioName <$> fromField f x
+
 
 instance FromField BondCouponValue where
   fromField f x = (BondCouponValue <$> realToFrac) <$> (fromField @Scientific f x)
@@ -50,38 +87,10 @@ instance FromField BondCouponPercent where
 instance ToText BondCouponPercent where
   toText = toText . show . Newtype.unpack
 
-instance FromField BondIssueDate where
-  fromField f x = BondIssueDate <$> fromField f x
-
-instance FromField BondMatDate where
-  fromField f x = BondMatDate <$> fromField f x
-
-instance FromField BondShortName where
-  fromField f x = BondShortName <$> fromField f x
-
-instance FromField BondFullName where
-  fromField f x = BondFullName <$> fromField f x
-
-instance FromField TradeAggDate where
-  fromField f x = TradeAggDate <$> fromField f x
-
-instance FromField TradeAggVol where
-  fromField f x = TradeAggVol <$> fromField f x
-
-instance ToField Market where
-  toField (Market x) = toField x
 
 instance ToField Price where
   toField (Price x) = toField (realToFrac x :: Scientific)
 
-instance ToField Volume where
-  toField (Volume x) = toField x
-
-instance ToField Qty where
-  toField = toField . Newtype.unpack
-
-instance FromField Qty where
-  fromField f x  = Newtype.pack <$> fromField f x
 
 instance HasColumn "bondshortname" (Proxy Symbol) where
   column _ _ = "symbol"
@@ -181,17 +190,6 @@ instance HasColumn "bondportfolio" (Proxy BondPortfolioId) where
 instance FromRow BondPortfolioId where
   fromRow = BondPortfolioId <$> field
 
-instance FromField BondPortfolioId where
-  fromField f x = BondPortfolioId <$> fromField f x
-
-instance ToField BondPortfolioId where
-  toField (BondPortfolioId x) = toField x
-
-instance ToField BondPortfolioName where
-  toField (BondPortfolioName x) = toField x
-
-instance FromField BondPortfolioName where
-  fromField f x = BondPortfolioName <$> fromField f x
 
 instance HasColumn "bondportfolioposition" (Proxy BondPortfolioId) where
   column _ _ = "portfolioid"
@@ -202,11 +200,6 @@ instance HasColumn "bondportfolioposition" (Proxy Symbol) where
 instance HasColumn "bondportfolioposition" (Proxy Qty) where
   column _ _ = "qty"
 
-instance FromField BondPortfolioUUID where
-  fromField t x = BondPortfolioUUID <$> fromField t x
-
-instance ToField BondPortfolioUUID where
-  toField  = toField . Newtype.unpack
 
 instance FromRow BondPortfolioUUID where
   fromRow = BondPortfolioUUID <$> field
@@ -294,11 +287,6 @@ instance HasColumn "bondcoupondate" (Proxy BondCouponDate) where
   column _ _  = "day"
 
 
-instance FromField BondCouponDate where
-  fromField f x = BondCouponDate <$> fromField f x
-
-instance ToField BondCouponDate where
-  toField x = toField (Newtype.unpack x)
 
 instance FromRow BondCouponDate where
   fromRow = BondCouponDate <$> field
