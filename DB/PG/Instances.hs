@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
+{-# LANGUAGE QuasiQuotes, ExtendedDefaultRules, UndecidableInstances #-}
 module DB.PG.Instances where
 
 import Control.Newtype as Newtype
@@ -23,11 +23,14 @@ import Text.InterpolatedString.Perl6 (qc)
 import DB.PG
 import Data.MOEX
 
+instance (FromRow a, Newtype.Newtype a Text) => FromRow a where
+  fromRow = Newtype.pack <$> field
+
 instance ToText Day where
   toText d = toText (show d)
 
-instance FromRow Symbol where
-  fromRow = Symbol <$> field
+-- instance FromRow Symbol where
+--   fromRow = Symbol <$> field
 
 instance ToField Symbol where
   toField x = toField (Newtype.unpack x)
