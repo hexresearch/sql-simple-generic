@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
+{-# LANGUAGE QuasiQuotes, ExtendedDefaultRules, UndecidableInstances #-}
 module DB.PG.Instances where
 
 import Control.Newtype as Newtype
@@ -75,7 +75,7 @@ instance ToField Price where
   toField (Price x) = toField (realToFrac x :: Scientific)
 
 instance ToField Volume where
-  toField (Volume x) = toField (realToFrac x :: Scientific)
+  toField (Volume x) = toField x
 
 instance ToField Qty where
   toField = toField . Newtype.unpack
