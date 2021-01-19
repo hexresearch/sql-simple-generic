@@ -63,7 +63,7 @@ data RecordSet (table :: Symbol) cols = RecordSet
 
 data QueryPart (table :: Symbol) pred = QueryPart pred
 
-data TableColumns (table :: Symbol) cols = TableColumns
+data ColumnSet (table :: Symbol) cols = ColumnSet
 
 data Where p = Where p
 
@@ -167,8 +167,8 @@ instance KnownSymbol t => HasTable (Insert (Table t) values r) e where
   tablename e _ = tablename e (Proxy @(Table t))
 
 instance ( KnownSymbol t
-         , HasColumns (TableColumns t ret)
-         , HasColumns (TableColumns t values)
+         , HasColumns (ColumnSet t ret)
+         , HasColumns (ColumnSet t values)
          , FromRow ret
          , ToRow values
          , FromRow ret
@@ -181,8 +181,8 @@ instance ( KnownSymbol t
     query conn sql values
     where
       table = tablename eng st
-      retColNames = columns (TableColumns :: TableColumns t ret)
-      colNames = columns (TableColumns :: TableColumns t values)
+      retColNames = columns (ColumnSet :: ColumnSet t ret)
+      colNames = columns (ColumnSet :: ColumnSet t values)
       cols     = Text.intercalate "," colNames
       retCols  = Text.intercalate "," retColNames
       binds    = Text.intercalate "," [ "?" | x <- colNames ]
@@ -259,9 +259,9 @@ instance (HasBindValueList a) => HasBindValueList (Where a) where
   bindValueList (Where x) = bindValueList x
 
 instance ( KnownSymbol t
-         , HasColumns (TableColumns t ret)
-         , HasColumns (TableColumns t k)
-         , HasColumns (TableColumns t v)
+         , HasColumns (ColumnSet t ret)
+         , HasColumns (ColumnSet t k)
+         , HasColumns (ColumnSet t v)
          , HasBindValueList (KeyValues k v)
          , FromRow ret
          ) =>
@@ -297,10 +297,10 @@ returning {retColDef}
 
       updVals = colsList [ [qc|{v} = excluded.{v}|] | v <- colsV ]
 
-      retColNames = columns (TableColumns :: TableColumns t ret)
+      retColNames = columns (ColumnSet :: ColumnSet t ret)
 
-      colsK  = columns (TableColumns :: TableColumns t k)
-      colsV =  columns (TableColumns :: TableColumns t v)
+      colsK  = columns (ColumnSet :: ColumnSet t k)
+      colsV =  columns (ColumnSet :: ColumnSet t v)
 
       retCols  = colsList retColNames
       binds    = colsList [ "?" | x <- colNames ]
@@ -316,17 +316,17 @@ returning {retColDef}
         _  -> [qc|values({binds})|]
 
 
-instance {-# OVERLAPPING #-} (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (TableColumns t a) where
+instance {-# OVERLAPPING #-} (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (ColumnSet t a) where
   columns = const [ column (Proxy @t) (Proxy @a) ]
 
-instance {-# OVERLAPPING #-} (KnownSymbol t) => HasColumns (TableColumns t ()) where
+instance {-# OVERLAPPING #-} (KnownSymbol t) => HasColumns (ColumnSet t ()) where
   columns = const []
 
 instance {-# OVERLAPPING #-}
          ( KnownSymbol t
          , HasColumn t (Proxy a1)
          , HasColumn t (Proxy a2)
-         ) => HasColumns (TableColumns t (a1,a2)) where
+         ) => HasColumns (ColumnSet t (a1,a2)) where
   columns = const [ column (Proxy @t) (Proxy @a1)
                   , column (Proxy @t) (Proxy @a2)
                   ]
@@ -335,7 +335,7 @@ instance  {-# OVERLAPPING #-} ( KnownSymbol t
          , HasColumn t (Proxy a1)
          , HasColumn t (Proxy a2)
          , HasColumn t (Proxy a3)
-         ) => HasColumns (TableColumns t (a1,a2,a3)) where
+         ) => HasColumns (ColumnSet t (a1,a2,a3)) where
   columns = const [ column (Proxy @t) (Proxy @a1)
                   , column (Proxy @t) (Proxy @a2)
                   , column (Proxy @t) (Proxy @a3)
@@ -346,7 +346,7 @@ instance  {-# OVERLAPPING #-} ( KnownSymbol t
          , HasColumn t (Proxy a2)
          , HasColumn t (Proxy a3)
          , HasColumn t (Proxy a4)
-         ) => HasColumns (TableColumns t (a1,a2,a3,a4)) where
+         ) => HasColumns (ColumnSet t (a1,a2,a3,a4)) where
   columns = const [ column (Proxy @t) (Proxy @a1)
                   , column (Proxy @t) (Proxy @a2)
                   , column (Proxy @t) (Proxy @a3)
@@ -359,7 +359,7 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
          , HasColumn t (Proxy a3)
          , HasColumn t (Proxy a4)
          , HasColumn t (Proxy a5)
-         ) => HasColumns (TableColumns t (a1,a2,a3,a4,a5)) where
+         ) => HasColumns (ColumnSet t (a1,a2,a3,a4,a5)) where
   columns = const [ column (Proxy @t) (Proxy @a1)
                   , column (Proxy @t) (Proxy @a2)
                   , column (Proxy @t) (Proxy @a3)
@@ -374,7 +374,7 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
          , HasColumn t (Proxy a4)
          , HasColumn t (Proxy a5)
          , HasColumn t (Proxy a6)
-         ) => HasColumns (TableColumns t (a1,a2,a3,a4,a5,a6)) where
+         ) => HasColumns (ColumnSet t (a1,a2,a3,a4,a5,a6)) where
   columns = const [ column (Proxy @t) (Proxy @a1)
                   , column (Proxy @t) (Proxy @a2)
                   , column (Proxy @t) (Proxy @a3)
@@ -392,7 +392,7 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
          , HasColumn t (Proxy a5)
          , HasColumn t (Proxy a6)
          , HasColumn t (Proxy a7)
-         ) => HasColumns (TableColumns t (a1,a2,a3,a4,a5,a6,a7)) where
+         ) => HasColumns (ColumnSet t (a1,a2,a3,a4,a5,a6,a7)) where
   columns = const [ column (Proxy @t) (Proxy @a1)
                   , column (Proxy @t) (Proxy @a2)
                   , column (Proxy @t) (Proxy @a3)
@@ -411,7 +411,7 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
          , HasColumn t (Proxy a6)
          , HasColumn t (Proxy a7)
          , HasColumn t (Proxy a8)
-         ) => HasColumns (TableColumns t (a1,a2,a3,a4,a5,a6,a7,a8)) where
+         ) => HasColumns (ColumnSet t (a1,a2,a3,a4,a5,a6,a7,a8)) where
   columns = const [ column (Proxy @t) (Proxy @a1)
                   , column (Proxy @t) (Proxy @a2)
                   , column (Proxy @t) (Proxy @a3)
@@ -423,8 +423,8 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
                   ]
 
 -- FIXME: obsolete
-instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
-  tablename _ _ = fromString $ symbolVal (Proxy @t)
+-- instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
+--   tablename _ _ = fromString $ symbolVal (Proxy @t)
 
 
 instance {-# OVERLAPPABLE #-}
