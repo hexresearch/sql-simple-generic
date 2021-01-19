@@ -13,6 +13,7 @@ import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple hiding (In)
 import Database.PostgreSQL.Simple.ToField
 import Data.ByteString (ByteString)
+import Control.Monad.Catch hiding (Handler)
 import Data.Int
 import Data.Proxy
 import Data.String (IsString(..))
@@ -203,6 +204,15 @@ instance ( KnownSymbol t
         [] -> "default values"
         _  -> [qc|values({binds})|]
 
+insertB :: (InsertStatement a m e, MonadCatch m)  => e -> a -> m Bool
+insertB eng statement =
+    handle
+      ( \case
+          -- 23505: "duplicate key value violates unique constraint"
+          (PGSimple.SqlError {sqlState = "23505"}) -> pure False
+          e -> throwM e
+      ) $
+      fmap (const True) $ insert eng statement
 
 data ToRowItem = forall a . ToField a => ToRowItem a
 
