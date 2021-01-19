@@ -58,9 +58,6 @@ withEngine ea m = do
 data Table (table :: Symbol) = From | Into
 data Rows cols = Rows
 
-
-data RecordSet (table :: Symbol) cols = RecordSet
-
 data QueryPart (table :: Symbol) pred = QueryPart pred
 
 data ColumnSet (table :: Symbol) cols = ColumnSet
@@ -108,14 +105,11 @@ returning = Returning
 instance FromRow () where
   fromRow = (field :: (RowParser (Maybe Int)) ) >> pure ()
 
-instance KnownSymbol t => HasTable (RecordSet t cols) e where
-  tablename _ _ = fromString (symbolVal (Proxy @t))
-
 instance KnownSymbol t => HasTable (Proxy (Table t)) e where
   tablename _ _ = fromString (symbolVal (Proxy @t))
 
 instance ( KnownSymbol t
-         , HasColumns (RecordSet t [row])
+         , HasColumns (ColumnSet t row)
          , HasColumns (QueryPart t pred)
          , FromRow row
          , HasBindValueList pred
@@ -129,7 +123,7 @@ instance ( KnownSymbol t
     where
       binds = bindValueList foo
       table = tablename eng (Proxy @(Table t))
-      cols  = Text.intercalate "," (columns (RecordSet :: RecordSet t [row]))
+      cols  = Text.intercalate "," (columns (ColumnSet :: ColumnSet t row))
       whereCols :: Text.Text
       whereCols | List.null binds = "true"
                 | otherwise  =
@@ -316,7 +310,7 @@ returning {retColDef}
         _  -> [qc|values({binds})|]
 
 
-instance {-# OVERLAPPING #-} (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (ColumnSet t a) where
+instance {-# OVERLAPPABLE #-} (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (ColumnSet t a) where
   columns = const [ column (Proxy @t) (Proxy @a) ]
 
 instance {-# OVERLAPPING #-} (KnownSymbol t) => HasColumns (ColumnSet t ()) where
@@ -543,118 +537,4 @@ instance ( KnownSymbol t
 
 instance HasColumns (QueryPart t ()) where
   columns = const mempty
-
-instance {-# OVERLAPPABLE #-}( HasColumn t (Proxy a)
-         , KnownSymbol t
-         ) => HasColumns (RecordSet t [a]) where
-  columns = const [ column (Proxy @t) (Proxy @a)
-                  ]
-
-instance ( HasColumn t (Proxy a)
-         , HasColumn t (Proxy b)
-         , KnownSymbol t
-         ) => HasColumns (RecordSet t [(a, b)]) where
-  columns = const [ column (Proxy @t) (Proxy @a)
-                  , column (Proxy @t) (Proxy @b)
-                  ]
-
-instance ( HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , KnownSymbol t
-         ) => HasColumns (RecordSet t [(a1, a2, a3)]) where
-
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  ]
-
-instance ( HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , KnownSymbol t
-         ) => HasColumns (RecordSet t [(a1, a2, a3, a4)]) where
-
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  ]
-
-
-instance ( HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , HasColumn t (Proxy a5)
-         , KnownSymbol t
-         ) => HasColumns (RecordSet t [(a1, a2, a3, a4, a5)]) where
-
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  , column (Proxy @t) (Proxy @a5)
-                  ]
-
-
-instance ( HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , HasColumn t (Proxy a5)
-         , HasColumn t (Proxy a6)
-         , KnownSymbol t
-         ) => HasColumns (RecordSet t [(a1, a2, a3, a4, a5, a6)]) where
-
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  , column (Proxy @t) (Proxy @a5)
-                  , column (Proxy @t) (Proxy @a6)
-                  ]
-
-
-instance ( HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , HasColumn t (Proxy a5)
-         , HasColumn t (Proxy a6)
-         , HasColumn t (Proxy a7)
-         , KnownSymbol t
-         ) => HasColumns (RecordSet t [(a1, a2, a3, a4, a5, a6,a7)]) where
-
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  , column (Proxy @t) (Proxy @a5)
-                  , column (Proxy @t) (Proxy @a6)
-                  , column (Proxy @t) (Proxy @a7)
-                  ]
-
-
-instance ( HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , HasColumn t (Proxy a5)
-         , HasColumn t (Proxy a6)
-         , HasColumn t (Proxy a7)
-         , HasColumn t (Proxy a8)
-         , KnownSymbol t
-         ) => HasColumns (RecordSet t [(a1, a2, a3, a4, a5, a6,a7,a8)]) where
-
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  , column (Proxy @t) (Proxy @a5)
-                  , column (Proxy @t) (Proxy @a6)
-                  , column (Proxy @t) (Proxy @a7)
-                  , column (Proxy @t) (Proxy @a8)
-                  ]
 
