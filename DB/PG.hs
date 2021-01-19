@@ -83,6 +83,8 @@ data All a = All
 
 data Pred a = Eq a
 
+newtype InSet a = InSet [a]
+
 newtype Bound a = Bound a
 
 rows :: Rows a
@@ -122,7 +124,7 @@ instance ( KnownSymbol t
   select eng (Select _ _ (Where foo)) = do
     conn <- getConnection eng
     let sql = [qc|select {cols} from {table} where {whereCols}|]
---     print sql
+    print sql
     query conn sql binds
     where
       binds = bindValueList foo
@@ -131,7 +133,7 @@ instance ( KnownSymbol t
       whereCols :: Text.Text
       whereCols | List.null binds = "true"
                 | otherwise  =
-        Text.intercalate " and " [  [qc|{c} = ?|] | c <- columns (QueryPart @t foo) ]
+        Text.intercalate " and " (columns (QueryPart @t foo))
 
 
 instance ( KnownSymbol t
@@ -150,8 +152,16 @@ instance ( KnownSymbol t
       whereCols :: Text.Text
       whereCols | List.null binds = "true"
                 | otherwise  =
-        Text.intercalate " and " [  [qc|{c} = ?|] | c <- columns (QueryPart @t foo) ]
+        Text.intercalate " and " (columns (QueryPart @t foo))
 
+instance ( KnownSymbol t
+         , HasColumn t (Proxy a)
+         ) => HasColumn t (Proxy (InSet a)) where
+  column _ _ = column (Proxy @t) (Proxy @a)
+
+
+instance ToField a => ToField (InSet a) where
+  toField (InSet x) = toField (PgSimple.In x)
 
 instance KnownSymbol t => HasTable (Insert (Table t) values r) e where
   tablename e _ = tablename e (Proxy @(Table t))
@@ -357,7 +367,6 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
                   , column (Proxy @t) (Proxy @a5)
                   ]
 
-
 instance {-# OVERLAPPING #-} ( KnownSymbol t
          , HasColumn t (Proxy a1)
          , HasColumn t (Proxy a2)
@@ -413,15 +422,25 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
                   , column (Proxy @t) (Proxy @a8)
                   ]
 
-
+-- FIXME: obsolete
 instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
   tablename _ _ = fromString $ symbolVal (Proxy @t)
 
 
 instance {-# OVERLAPPABLE #-}
-         ( KnownSymbol t, HasColumn t (Proxy a)
+         (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Proxy (QueryPart t a)) where
+  column _ _ = [qc|{c} = ?|]
+    where c = column (Proxy @t) (Proxy @a)
+
+instance {-# OVERLAPPABLE #-}
+         (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Proxy (QueryPart t (InSet a))) where
+  column _ _ = [qc|{c} in ?|]
+    where c = column (Proxy @t) (Proxy @a)
+
+instance {-# OVERLAPPABLE #-}
+         ( KnownSymbol t, HasColumn t (Proxy (QueryPart t a))
          ) => HasColumns (QueryPart t a) where
-  columns = const [ column (Proxy @t) (Proxy @a)
+  columns = const [ column (Proxy @t) (Proxy @(QueryPart t a))
                   ]
 
 instance {-# OVERLAPPING #-} KnownSymbol t => HasColumns (QueryPart t ()) where
@@ -431,8 +450,8 @@ instance ( HasColumn t (Proxy a1)
          , HasColumn t (Proxy a2)
          , KnownSymbol t
          ) => HasColumns (QueryPart t (a1,a2))   where
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
+  columns = const [ column (Proxy @t) (Proxy @(QueryPart t a1))
+                  , column (Proxy @t) (Proxy @(QueryPart t a2))
                   ]
 
 instance {-# OVERLAPPABLE #-}( HasColumn t (Proxy a)
