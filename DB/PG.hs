@@ -426,33 +426,31 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
 -- instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
 --   tablename _ _ = fromString $ symbolVal (Proxy @t)
 
-
 instance {-# OVERLAPPABLE #-}
-         (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Proxy (QueryPart t a)) where
+         (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (QueryPart t a) where
   column _ _ = [qc|{c} = ?|]
     where c = column (Proxy @t) (Proxy @a)
 
 instance {-# OVERLAPPABLE #-}
-         (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Proxy (QueryPart t (InSet a))) where
+         (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (QueryPart t (InSet a)) where
   column _ _ = [qc|{c} in ?|]
     where c = column (Proxy @t) (Proxy @a)
 
-instance {-# OVERLAPPABLE #-}
-         ( KnownSymbol t, HasColumn t (Proxy (QueryPart t a))
-         ) => HasColumns (QueryPart t a) where
-  columns = const [ column (Proxy @t) (Proxy @(QueryPart t a))
-                  ]
+-- instance {-# OVERLAPPABLE #-}
+--          ( KnownSymbol t, HasColumn t (Proxy (QueryPart t a))
+--          ) => HasColumns (QueryPart t a) where
+--   columns = const [ column (Proxy @t) (Proxy @(QueryPart t a))
+--                   ]
 
 instance {-# OVERLAPPING #-} KnownSymbol t => HasColumns (QueryPart t ()) where
   columns = const mempty
 
-instance ( HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , KnownSymbol t
-         ) => HasColumns (QueryPart t (a1,a2))   where
-  columns = const [ column (Proxy @t) (Proxy @(QueryPart t a1))
-                  , column (Proxy @t) (Proxy @(QueryPart t a2))
-                  ]
+instance {-# OVERLAPPING #-}  (HasColumn t (QueryPart t a)) => HasColumns (QueryPart t a) where
+  columns x = [ column (Proxy @t) x ]
+
+instance {-# OVERLAPPING #-}  (HasColumn t (QueryPart t a1), HasColumn t (QueryPart t a2) )
+      => HasColumns (QueryPart t (a1,a2)) where
+  columns (QueryPart (x1,x2)) = [ column (Proxy @t) (QueryPart @t x1), column (Proxy @t) (QueryPart @t x2) ]
 
 instance {-# OVERLAPPABLE #-}( HasColumn t (Proxy a)
          , KnownSymbol t
