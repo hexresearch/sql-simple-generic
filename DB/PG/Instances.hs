@@ -71,6 +71,12 @@ deriving newtype instance ToField BondPortfolioUUID
 deriving newtype instance FromField BondCouponDate
 deriving newtype instance ToField BondCouponDate
 
+deriving newtype instance FromField Month
+deriving newtype instance ToField Month
+
+deriving newtype instance FromField Year
+deriving newtype instance ToField Year
+
 instance ToField BondPortfolioName where
   toField (BondPortfolioName x) = toField x
 

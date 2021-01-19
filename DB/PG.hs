@@ -422,35 +422,127 @@ instance {-# OVERLAPPING #-} ( KnownSymbol t
                   , column (Proxy @t) (Proxy @a8)
                   ]
 
--- FIXME: obsolete
--- instance KnownSymbol t => HasTable (All (RecordSet t a)) e where
---   tablename _ _ = fromString $ symbolVal (Proxy @t)
+data ColumnProxy (t::Symbol) = forall a . (HasColumn t (Proxy a)) => ColumnProxy (Proxy t) (Proxy a)
 
-instance {-# OVERLAPPABLE #-}
-         (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (QueryPart t a) where
-  column _ _ = [qc|{c} = ?|]
-    where c = column (Proxy @t) (Proxy @a)
+class KnownSymbol t => HasColumnProxies t a where
+  columnProxies :: a -> [ColumnProxy t]
 
-instance {-# OVERLAPPABLE #-}
-         (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (QueryPart t (InSet a)) where
-  column _ _ = [qc|{c} in ?|]
-    where c = column (Proxy @t) (Proxy @a)
+instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumnProxies t a where
+  columnProxies = const [ColumnProxy (Proxy @t) (Proxy @a) ]
 
--- instance {-# OVERLAPPABLE #-}
---          ( KnownSymbol t, HasColumn t (Proxy (QueryPart t a))
---          ) => HasColumns (QueryPart t a) where
---   columns = const [ column (Proxy @t) (Proxy @(QueryPart t a))
---                   ]
+instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t a) where
+  columns _ = [ exprOf $ column (Proxy @t) (Proxy @a) ]
+    where
+      exprOf :: Text -> Text
+      exprOf x = [qc|{x} = ?|]
 
-instance {-# OVERLAPPING #-} KnownSymbol t => HasColumns (QueryPart t ()) where
-  columns = const mempty
+instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t (InSet a)) where
+  columns _ = [ [qc|{col} in ?|]  ]
+    where col = column (Proxy @t) (Proxy @a)
 
-instance {-# OVERLAPPING #-}  (HasColumn t (QueryPart t a)) => HasColumns (QueryPart t a) where
-  columns x = [ column (Proxy @t) x ]
-
-instance {-# OVERLAPPING #-}  (HasColumn t (QueryPart t a1), HasColumn t (QueryPart t a2) )
+instance ( KnownSymbol t
+         , HasColumns (QueryPart t a1)
+         , HasColumns (QueryPart t a2))
       => HasColumns (QueryPart t (a1,a2)) where
-  columns (QueryPart (x1,x2)) = [ column (Proxy @t) (QueryPart @t x1), column (Proxy @t) (QueryPart @t x2) ]
+  columns (QueryPart (x1,x2)) = columns (QueryPart @t x1 ) <> columns (QueryPart @t x2)
+
+
+instance ( KnownSymbol t
+         , HasColumns (QueryPart t a1)
+         , HasColumns (QueryPart t a2)
+         , HasColumns (QueryPart t a3))
+      => HasColumns (QueryPart t (a1,a2,a3)) where
+  columns (QueryPart (x1,x2,x3)) =  columns (QueryPart @t x1 )
+                                 <> columns (QueryPart @t x2)
+                                 <> columns (QueryPart @t x3)
+
+
+instance ( KnownSymbol t
+         , HasColumns (QueryPart t a1)
+         , HasColumns (QueryPart t a2)
+         , HasColumns (QueryPart t a3)
+         , HasColumns (QueryPart t a4)
+         )
+      => HasColumns (QueryPart t (a1,a2,a3,a4)) where
+  columns (QueryPart (x1,x2,x3,x4)) =  columns (QueryPart @t x1)
+                                    <> columns (QueryPart @t x2)
+                                    <> columns (QueryPart @t x3)
+                                    <> columns (QueryPart @t x4)
+
+instance ( KnownSymbol t
+         , HasColumns (QueryPart t a1)
+         , HasColumns (QueryPart t a2)
+         , HasColumns (QueryPart t a3)
+         , HasColumns (QueryPart t a4)
+         , HasColumns (QueryPart t a5)
+         )
+      => HasColumns (QueryPart t (a1,a2,a3,a4,a5)) where
+  columns (QueryPart (x1,x2,x3,x4,x5)) =  columns (QueryPart @t x1)
+                                      <> columns (QueryPart @t x2)
+                                      <> columns (QueryPart @t x3)
+                                      <> columns (QueryPart @t x4)
+                                      <> columns (QueryPart @t x5)
+
+
+instance ( KnownSymbol t
+         , HasColumns (QueryPart t a1)
+         , HasColumns (QueryPart t a2)
+         , HasColumns (QueryPart t a3)
+         , HasColumns (QueryPart t a4)
+         , HasColumns (QueryPart t a5)
+         , HasColumns (QueryPart t a6)
+         )
+      => HasColumns (QueryPart t (a1,a2,a3,a4,a5,a6)) where
+  columns (QueryPart (x1,x2,x3,x4,x5,x6)) =  columns (QueryPart @t x1)
+                                         <> columns (QueryPart @t x2)
+                                         <> columns (QueryPart @t x3)
+                                         <> columns (QueryPart @t x4)
+                                         <> columns (QueryPart @t x5)
+                                         <> columns (QueryPart @t x6)
+
+
+instance ( KnownSymbol t
+         , HasColumns (QueryPart t a1)
+         , HasColumns (QueryPart t a2)
+         , HasColumns (QueryPart t a3)
+         , HasColumns (QueryPart t a4)
+         , HasColumns (QueryPart t a5)
+         , HasColumns (QueryPart t a6)
+         , HasColumns (QueryPart t a7)
+         )
+      => HasColumns (QueryPart t (a1,a2,a3,a4,a5,a6,a7)) where
+  columns (QueryPart (x1,x2,x3,x4,x5,x6,x7)) =  columns (QueryPart @t x1)
+                                         <> columns (QueryPart @t x2)
+                                         <> columns (QueryPart @t x3)
+                                         <> columns (QueryPart @t x4)
+                                         <> columns (QueryPart @t x5)
+                                         <> columns (QueryPart @t x6)
+                                         <> columns (QueryPart @t x7)
+
+instance ( KnownSymbol t
+         , HasColumns (QueryPart t a1)
+         , HasColumns (QueryPart t a2)
+         , HasColumns (QueryPart t a3)
+         , HasColumns (QueryPart t a4)
+         , HasColumns (QueryPart t a5)
+         , HasColumns (QueryPart t a6)
+         , HasColumns (QueryPart t a7)
+         , HasColumns (QueryPart t a8)
+         )
+      => HasColumns (QueryPart t (a1,a2,a3,a4,a5,a6,a7,a8)) where
+  columns (QueryPart (x1,x2,x3,x4,x5,x6,x7,x8)) =  columns (QueryPart @t x1)
+                                         <> columns (QueryPart @t x2)
+                                         <> columns (QueryPart @t x3)
+                                         <> columns (QueryPart @t x4)
+                                         <> columns (QueryPart @t x5)
+                                         <> columns (QueryPart @t x6)
+                                         <> columns (QueryPart @t x7)
+                                         <> columns (QueryPart @t x8)
+
+
+
+instance HasColumns (QueryPart t ()) where
+  columns = const mempty
 
 instance {-# OVERLAPPABLE #-}( HasColumn t (Proxy a)
          , KnownSymbol t
