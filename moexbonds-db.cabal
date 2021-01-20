@@ -37,7 +37,7 @@ common shared-properties
 
 library
   import: shared-properties
-  exposed-modules:     DB, DB.PG, DB.PG.Instances
+  exposed-modules:     DB, DB.PG
   other-modules:
   -- other-extensions:
   build-depends:       base ^>=4.13.0.0
