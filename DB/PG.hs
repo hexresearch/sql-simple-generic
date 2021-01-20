@@ -1,5 +1,10 @@
 {-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeInType #-}
 module DB.PG ( module DB
              , module DB.PG
              ) where
@@ -13,10 +18,12 @@ import Data.Proxy
 import Data.String (IsString(..))
 import Data.Text (Text)
 import GHC.TypeLits
+import GHC.Generics as Generics
 import qualified Database.PostgreSQL.Simple as PgSimple
 import qualified Data.List as List
 import qualified Data.Text as Text
 import Text.InterpolatedString.Perl6 (qc)
+import Data.Typeable
 
 import DB
 
@@ -537,4 +544,30 @@ instance ( KnownSymbol t
 
 instance HasColumns (QueryPart t ()) where
   columns = const mempty
+
+wtf :: forall a. (Generic a, GWTF a (Rep a)) => [String]
+wtf = gwtf @a @(Rep a)
+
+class GWTF a (f :: * -> *) where
+  gwtf :: [String]
+
+instance (Typeable a) => GWTF a (M1 D ('MetaData i k l 'True) f) where
+  gwtf = [ show $ typeRep (Proxy @a) ]
+
+instance (GWTF' f) => GWTF a (M1 D ('MetaData i k l 'False) f) where
+  gwtf = gwtf' @f
+
+class GWTF' (f :: * -> *) where
+  gwtf' :: [String]
+
+instance GWTF' f => GWTF' (M1 c m f) where
+  gwtf' = gwtf' @f
+
+instance (GWTF' f, GWTF' g) => GWTF' (f :*: g) where
+  gwtf' = gwtf' @f <> gwtf' @g
+
+instance (Typeable a) => GWTF' (K1 r a) where
+  gwtf' = [ show $ typeRep (Proxy @a) ]
+
+
 
