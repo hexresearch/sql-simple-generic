@@ -317,119 +317,18 @@ returning {retColDef}
         _  -> [qc|values({binds})|]
 
 
-instance {-# OVERLAPPABLE #-} (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (ColumnSet t a) where
-  columns = const [ column (Proxy @t) (Proxy @a) ]
+instance {-# OVERLAPPABLE #-}
+         ( KnownSymbol t
+         , Generic a
+         , GColProxy t a (Rep a)
+         ) => HasColumns (ColumnSet t a) where
+  columns _ = fmap (\(ColumnProxy t c) -> column t c) (colproxy @t @a)
 
 instance {-# OVERLAPPING #-} (KnownSymbol t) => HasColumns (ColumnSet t ()) where
   columns = const []
 
-instance {-# OVERLAPPING #-}
-         ( KnownSymbol t
-         , HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         ) => HasColumns (ColumnSet t (a1,a2)) where
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  ]
-
-instance  {-# OVERLAPPING #-} ( KnownSymbol t
-         , HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         ) => HasColumns (ColumnSet t (a1,a2,a3)) where
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  ]
-
-instance  {-# OVERLAPPING #-} ( KnownSymbol t
-         , HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         ) => HasColumns (ColumnSet t (a1,a2,a3,a4)) where
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  ]
-
-instance {-# OVERLAPPING #-} ( KnownSymbol t
-         , HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , HasColumn t (Proxy a5)
-         ) => HasColumns (ColumnSet t (a1,a2,a3,a4,a5)) where
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  , column (Proxy @t) (Proxy @a5)
-                  ]
-
-instance {-# OVERLAPPING #-} ( KnownSymbol t
-         , HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , HasColumn t (Proxy a5)
-         , HasColumn t (Proxy a6)
-         ) => HasColumns (ColumnSet t (a1,a2,a3,a4,a5,a6)) where
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  , column (Proxy @t) (Proxy @a5)
-                  , column (Proxy @t) (Proxy @a6)
-                  ]
-
-
-instance {-# OVERLAPPING #-} ( KnownSymbol t
-         , HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , HasColumn t (Proxy a5)
-         , HasColumn t (Proxy a6)
-         , HasColumn t (Proxy a7)
-         ) => HasColumns (ColumnSet t (a1,a2,a3,a4,a5,a6,a7)) where
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  , column (Proxy @t) (Proxy @a5)
-                  , column (Proxy @t) (Proxy @a6)
-                  , column (Proxy @t) (Proxy @a7)
-                  ]
-
-instance {-# OVERLAPPING #-} ( KnownSymbol t
-         , HasColumn t (Proxy a1)
-         , HasColumn t (Proxy a2)
-         , HasColumn t (Proxy a3)
-         , HasColumn t (Proxy a4)
-         , HasColumn t (Proxy a5)
-         , HasColumn t (Proxy a6)
-         , HasColumn t (Proxy a7)
-         , HasColumn t (Proxy a8)
-         ) => HasColumns (ColumnSet t (a1,a2,a3,a4,a5,a6,a7,a8)) where
-  columns = const [ column (Proxy @t) (Proxy @a1)
-                  , column (Proxy @t) (Proxy @a2)
-                  , column (Proxy @t) (Proxy @a3)
-                  , column (Proxy @t) (Proxy @a4)
-                  , column (Proxy @t) (Proxy @a5)
-                  , column (Proxy @t) (Proxy @a6)
-                  , column (Proxy @t) (Proxy @a7)
-                  , column (Proxy @t) (Proxy @a8)
-                  ]
 
 data ColumnProxy (t::Symbol) = forall a . (HasColumn t (Proxy a)) => ColumnProxy (Proxy t) (Proxy a)
-
-class KnownSymbol t => HasColumnProxies t a where
-  columnProxies :: a -> [ColumnProxy t]
-
-instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumnProxies t a where
-  columnProxies = const [ColumnProxy (Proxy @t) (Proxy @a) ]
 
 instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t a) where
   columns _ = [ exprOf $ column (Proxy @t) (Proxy @a) ]
@@ -545,29 +444,31 @@ instance ( KnownSymbol t
 instance HasColumns (QueryPart t ()) where
   columns = const mempty
 
-wtf :: forall a. (Generic a, GWTF a (Rep a)) => [String]
-wtf = gwtf @a @(Rep a)
+colproxy :: forall t  a . (KnownSymbol t, Generic a, GColProxy t a (Rep a)) => [ColumnProxy t]
+colproxy = gcolproxy @t @a @(Rep a)
 
-class GWTF a (f :: * -> *) where
-  gwtf :: [String]
+class GColProxy t a (f :: * -> *) where
+  gcolproxy :: [ColumnProxy t]
 
-instance (Typeable a) => GWTF a (M1 D ('MetaData i k l 'True) f) where
-  gwtf = [ show $ typeRep (Proxy @a) ]
+instance (HasColumn t (Proxy a)) => GColProxy t a (M1 D ('MetaData i k l 'True) f) where
+  gcolproxy = [ ColumnProxy (Proxy @t) (Proxy @a) ]
 
-instance (GWTF' f) => GWTF a (M1 D ('MetaData i k l 'False) f) where
-  gwtf = gwtf' @f
+instance (GColProxy' t f) => GColProxy t a (M1 D ('MetaData i k l 'False) f) where
+  gcolproxy = gcolproxy' @t @f
 
-class GWTF' (f :: * -> *) where
-  gwtf' :: [String]
+class GColProxy' t (f :: * -> *) where
+  gcolproxy' :: [ColumnProxy t]
 
-instance GWTF' f => GWTF' (M1 c m f) where
-  gwtf' = gwtf' @f
+instance GColProxy' t f => GColProxy' t (M1 c m f) where
+  gcolproxy' = gcolproxy' @t @f
 
-instance (GWTF' f, GWTF' g) => GWTF' (f :*: g) where
-  gwtf' = gwtf' @f <> gwtf' @g
+instance (GColProxy' t f, GColProxy' t g) => GColProxy' t (f :*: g) where
+  gcolproxy' = gcolproxy' @t @f <> gcolproxy' @t @g
 
-instance (Typeable a) => GWTF' (K1 r a) where
-  gwtf' = [ show $ typeRep (Proxy @a) ]
+instance (HasColumn t (Proxy a)) => GColProxy' t (K1 r a) where
+  gcolproxy' = [ ColumnProxy (Proxy @t) (Proxy @a) ]
 
+instance (HasColumn t (Proxy a)) => GColProxy' t U1 where
+  gcolproxy' = mempty
 
 
