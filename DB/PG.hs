@@ -209,7 +209,7 @@ insertB eng statement =
     handle
       ( \case
           -- 23505: "duplicate key value violates unique constraint"
-          (PGSimple.SqlError {sqlState = "23505"}) -> pure False
+          (PgSimple.SqlError {sqlState = "23505"}) -> pure False
           e -> throwM e
       ) $
       fmap (const True) $ insert eng statement
