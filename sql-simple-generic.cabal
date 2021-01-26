@@ -42,7 +42,6 @@ library
   -- other-extensions:
   build-depends:       base ^>=4.13.0.0
                      , bytestring
-                     , data-moex
                      , exceptions
                      , interpolatedstring-perl6
                      , newtype
