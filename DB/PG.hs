@@ -126,7 +126,7 @@ instance ( KnownSymbol t
   select eng (Select _ _ (Where foo)) = do
     conn <- getConnection eng
     let sql = [qc|select {cols} from {table} where {whereCols}|]
-    print sql
+--     print sql
     query conn sql binds
     where
       binds = bindValueList foo
