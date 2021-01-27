@@ -31,6 +31,10 @@ class SelectStatement q m e where
   type SelectResult q :: *
   select :: e -> q -> m (SelectResult q)
 
+class UpdateStatement q m e where
+  type UpdateResult q :: *
+  update :: e -> q -> m (UpdateResult q)
+
 class DeleteStatement q m e where
   type DeleteResult q :: *
   delete :: e -> q -> m (DeleteResult q)
