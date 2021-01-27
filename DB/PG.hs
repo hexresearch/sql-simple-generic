@@ -263,7 +263,19 @@ insertB eng statement =
       ) $
       fmap (const True) $ insert eng statement
 
-data QPart = forall t a . (HasColumn t (Proxy a), HasBindValueList a) => QPart a
+class HasProxy a where
+  proxyOf :: a -> Proxy a
+
+instance HasProxy a where
+  proxyOf = const $ Proxy @a
+
+data QPart (t::Symbol) = forall a . (HasProxy a, HasColumn t (Proxy a), HasBindValueList a) => QPart (Proxy t) a
+
+qpart :: forall t a . (HasProxy a, HasColumn t (Proxy a), HasBindValueList a) => a -> QPart t
+qpart x = QPart (Proxy @t) x
+
+qparts :: forall t f . [f (QPart t)] -> [f (QPart t)]
+qparts = id
 
 data ToRowItem = forall a . ToField a => ToRowItem a
 
@@ -276,10 +288,10 @@ class HasBindValueList a where
 instance {-# OVERLAPPABLE #-}  ToField a => HasBindValueList a where
   bindValueList a = [ToRowItem a]
 
-instance HasBindValueList (QPart) where
-  bindValueList (QPart x) = bindValueList x
+instance HasBindValueList (QPart t) where
+  bindValueList (QPart _ x) = bindValueList x
 
-instance HasBindValueList [QPart] where
+instance HasBindValueList [QPart t] where
   bindValueList a = foldMap bindValueList a
 
 instance HasBindValueList () where
@@ -394,7 +406,6 @@ instance {-# OVERLAPPABLE #-}
 instance {-# OVERLAPPING #-} (KnownSymbol t) => HasColumns (ColumnSet t ()) where
   columns = const []
 
-
 data ColumnProxy (t::Symbol) = forall a . (HasColumn t (Proxy a)) => ColumnProxy (Proxy t) (Proxy a)
 
 instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t a) where
@@ -403,12 +414,15 @@ instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumn
       exprOf :: Text -> Text
       exprOf x = [qc|{x} = ?|]
 
-instance KnownSymbol t => HasColumns (QueryPart t [QPart]) where
-  columns (QueryPart xs) = foldMap (\(QPart _) -> []) xs
-
 instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t (InSet a)) where
   columns _ = [ [qc|{col} in ?|]  ]
     where col = column (Proxy @t) (Proxy @a)
+
+-- FIXME: will be screwed on InSet
+--        but this is fixable
+instance KnownSymbol t => HasColumns (QueryPart t [QPart t]) where
+  columns (QueryPart xs) = foldMap (\(QPart pt e) -> [strOf (column pt (proxyOf e))]) xs
+    where strOf c = [qc|{c} = ?|]
 
 instance ( KnownSymbol t
          , HasColumns (QueryPart t a1)
