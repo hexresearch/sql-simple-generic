@@ -263,6 +263,8 @@ insertB eng statement =
       ) $
       fmap (const True) $ insert eng statement
 
+data QPart = forall t a . (HasColumn t (Proxy a), HasBindValueList a) => QPart a
+
 data ToRowItem = forall a . ToField a => ToRowItem a
 
 instance ToField ToRowItem where
@@ -273,6 +275,12 @@ class HasBindValueList a where
 
 instance {-# OVERLAPPABLE #-}  ToField a => HasBindValueList a where
   bindValueList a = [ToRowItem a]
+
+instance HasBindValueList (QPart) where
+  bindValueList (QPart x) = bindValueList x
+
+instance HasBindValueList [QPart] where
+  bindValueList a = foldMap bindValueList a
 
 instance HasBindValueList () where
   bindValueList = const mempty
@@ -394,6 +402,9 @@ instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumn
     where
       exprOf :: Text -> Text
       exprOf x = [qc|{x} = ?|]
+
+instance KnownSymbol t => HasColumns (QueryPart t [QPart]) where
+  columns (QueryPart xs) = foldMap (\(QPart _) -> []) xs
 
 instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t (InSet a)) where
   columns _ = [ [qc|{col} in ?|]  ]
@@ -529,5 +540,4 @@ instance (HasColumn t (Proxy a)) => GColProxy' t (K1 r a) where
 
 instance (HasColumn t (Proxy a)) => GColProxy' t U1 where
   gcolproxy' = mempty
-
 
