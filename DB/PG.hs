@@ -63,7 +63,7 @@ withEngine ea m = do
   disposeEngine e
   pure r
 
-data Table (table :: Symbol) = From | Into
+data Table (table :: Symbol) = From | Into | Table
 data Rows cols = Rows
 
 data QueryPart (table :: Symbol) pred = QueryPart pred
@@ -84,6 +84,8 @@ data Insert into values ret = Insert into values ret
 
 data Delete what pred = Delete what pred
 
+data Update what values pred = Update what values pred
+
 data All a = All
 
 data Pred a = Eq a
@@ -100,6 +102,9 @@ from = From
 
 into :: Table t
 into = Into
+
+table :: Table t
+table = Table
 
 values = Values
 
@@ -167,6 +172,50 @@ instance ToField a => ToField (InSet a) where
 
 instance KnownSymbol t => HasTable (Insert (Table t) values r) e where
   tablename e _ = tablename e (Proxy @(Table t))
+
+
+
+instance ( KnownSymbol t
+         , HasColumns (ColumnSet t values)
+         , HasColumns (QueryPart t pred)
+         , HasBindValueList ()
+         , HasBindValueList pred
+         , ToRow values
+         ) => UpdateStatement (Update (Table t) (Values ()) (Where pred)) IO PostgreSQLEngine where
+  type UpdateResult (Update (Table t) (Values ()) (Where pred)) = Integer
+  update eng _ = pure 0
+
+instance ( KnownSymbol t
+         , HasColumns (ColumnSet t values)
+         , HasColumns (QueryPart t pred)
+         , HasBindValueList values
+         , HasBindValueList pred
+         , ToRow values
+         ) => UpdateStatement (Update (Table t) (Values values) (Where pred)) IO PostgreSQLEngine where
+  type UpdateResult (Update (Table t) (Values values) (Where pred)) = Integer
+  update eng (Update _ (Values vals) (Where pred)) = do
+    conn <- getConnection eng
+    let sql = [qc|update {table} set {setDecl} where {whereCols}|]
+    n <- execute conn sql (bindVals <> bindPred)
+    pure (fromIntegral n)
+
+    where
+      table = tablename eng (Proxy @(Table t))
+
+      bindVals = bindValueList vals
+      bindPred = bindValueList pred
+
+      setDecl :: Text
+      setDecl | List.null setDecl' = ""
+              | otherwise = Text.intercalate "," setDecl'
+
+      setDecl' = [ [qc|{col} = ?|] | col <- columns (ColumnSet :: ColumnSet t values) ]
+
+      whereCols :: Text.Text
+      whereCols | List.null bindPred = "true"
+                | otherwise  =
+        Text.intercalate " and " (columns (QueryPart @t pred))
+
 
 instance ( KnownSymbol t
          , HasColumns (ColumnSet t ret)
