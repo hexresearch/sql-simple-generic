@@ -16,11 +16,13 @@ import Data.ByteString (ByteString)
 import Control.Monad.Catch hiding (Handler)
 import Data.Int
 import Data.Proxy
+import Data.Data
 import Data.String (IsString(..))
 import Data.Text (Text)
 import GHC.TypeLits
 import GHC.Generics as Generics
 import qualified Database.PostgreSQL.Simple as PgSimple
+import Database.PostgreSQL.Simple.ToField (ToField(..))
 import qualified Data.List as List
 import qualified Data.Text as Text
 import Text.InterpolatedString.Perl6 (qc)
@@ -92,6 +94,9 @@ data Pred a = Eq a
 
 newtype InSet a = InSet [a]
 
+newtype Like a = Like Text
+                 deriving (Show,Data,Generic)
+
 newtype Bound a = Bound a
 
 rows :: Rows a
@@ -131,7 +136,7 @@ instance ( KnownSymbol t
   select eng (Select _ _ (Where foo)) = do
     conn <- getConnection eng
     let sql = [qc|select {cols} from {table} where {whereCols}|]
---     print sql
+    print sql
     query conn sql binds
     where
       binds = bindValueList foo
@@ -269,9 +274,16 @@ class HasProxy a where
 instance HasProxy a where
   proxyOf = const $ Proxy @a
 
-data QPart (t::Symbol) = forall a . (HasProxy a, HasColumn t (Proxy a), HasBindValueList a) => QPart (Proxy t) a
+data QPart (t::Symbol) = forall a . ( HasProxy a
+                                    , HasColumn t (Proxy a)
+                                    , HasSQLOperator a
+                                    , HasBindValueList a) => QPart (Proxy t) a
 
-qpart :: forall t a . (HasProxy a, HasColumn t (Proxy a), HasBindValueList a) => a -> QPart t
+qpart :: forall t a . ( HasProxy a
+                      , HasColumn t (Proxy a)
+                      , HasBindValueList a
+                      , HasSQLOperator a
+                      ) => a -> QPart t
 qpart x = QPart (Proxy @t) x
 
 qparts :: forall t f . [f (QPart t)] -> [f (QPart t)]
@@ -409,20 +421,42 @@ instance {-# OVERLAPPING #-} (KnownSymbol t) => HasColumns (ColumnSet t ()) wher
 data ColumnProxy (t::Symbol) = forall a . (HasColumn t (Proxy a)) => ColumnProxy (Proxy t) (Proxy a)
 
 instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t a) where
-  columns _ = [ exprOf $ column (Proxy @t) (Proxy @a) ]
+  columns _ = [ exprOf (column (Proxy @t) (Proxy @a)) (sqlOperator (Proxy @a)) ]
     where
-      exprOf :: Text -> Text
-      exprOf x = [qc|{x} = ?|]
+      exprOf :: Text -> Text -> Text
+      exprOf col op = [qc| {col} {op} |]
 
-instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t (InSet a)) where
-  columns _ = [ [qc|{col} in ?|]  ]
-    where col = column (Proxy @t) (Proxy @a)
+class HasSQLOperator a where
+  sqlOperator :: a -> Text
+
+instance {-# OVERLAPPABLE #-} HasSQLOperator a where
+  sqlOperator = const " = ?"
+
+instance HasSQLOperator (Like a) where
+  sqlOperator = const " like ?"
+
+instance HasColumn t (Proxy a) => HasColumn t (Proxy (Like a)) where
+  column pt _ = column pt (Proxy @a)
+
+instance ToField a => ToField (Like a) where
+  toField (Like x) = toField x
+
+instance HasSQLOperator (InSet a) where
+  sqlOperator = const " in ?"
+
+instance HasSQLOperator (QPart t) where
+  sqlOperator (QPart _ e) = sqlOperator e
+
+instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Like a) where
+  column pt _ = column pt (Proxy @a)
 
 -- FIXME: will be screwed on InSet
 --        but this is fixable
 instance KnownSymbol t => HasColumns (QueryPart t [QPart t]) where
-  columns (QueryPart xs) = foldMap (\(QPart pt e) -> [strOf (column pt (proxyOf e))]) xs
-    where strOf c = [qc|{c} = ?|]
+  columns (QueryPart xs) = foldMap (\(QPart pt e) -> [strOf (column pt (proxyOf e)) (sqlOperator e)]) xs
+    where
+      strOf :: Text -> Text -> Text
+      strOf c op = [qc| {c} {op} |]
 
 instance ( KnownSymbol t
          , HasColumns (QueryPart t a1)
