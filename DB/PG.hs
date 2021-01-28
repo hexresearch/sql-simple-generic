@@ -136,7 +136,7 @@ instance ( KnownSymbol t
   select eng (Select _ _ (Where foo)) = do
     conn <- getConnection eng
     let sql = [qc|select {cols} from {table} where {whereCols}|]
-    print sql
+--     print sql
     query conn sql binds
     where
       binds = bindValueList foo
@@ -279,12 +279,20 @@ data QPart (t::Symbol) = forall a . ( HasProxy a
                                     , HasSQLOperator a
                                     , HasBindValueList a) => QPart (Proxy t) a
 
-qpart :: forall t a . ( HasProxy a
+clause  :: forall t a . ( HasProxy a
                       , HasColumn t (Proxy a)
                       , HasBindValueList a
                       , HasSQLOperator a
                       ) => a -> QPart t
-qpart x = QPart (Proxy @t) x
+clause x = QPart (Proxy @t) x
+
+like :: forall t a . ( HasProxy a
+                     , ToField a
+                     , HasColumn t (Proxy a)
+                     , HasBindValueList a
+                     , HasSQLOperator a
+                     ) => Text -> QPart t
+like x = QPart (Proxy @t) (Like @a x)
 
 qparts :: forall t f . [f (QPart t)] -> [f (QPart t)]
 qparts = id
