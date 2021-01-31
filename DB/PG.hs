@@ -10,6 +10,7 @@ module DB.PG ( module DB
              ) where
 
 import Control.Monad.Catch hiding (Handler)
+import Control.Newtype.Generics
 import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple hiding (In)
 import Database.PostgreSQL.Simple.ToField
@@ -99,6 +100,12 @@ newtype InSet a = InSet [a]
 
 newtype Like a = Like Text
                  deriving (Show,Data,Generic)
+
+-- FIXME: implement
+data NVL a = NVL a
+             deriving (Eq,Ord,Show,Data,Generic)
+
+instance Newtype (NVL a)
 
 newtype Bound a = Bound a
 
@@ -215,6 +222,7 @@ instance ( KnownSymbol t
   update eng (Update _ (Values vals) (Where pred)) = do
     conn <- getConnection eng
     let sql = [qc|update {table} set {setDecl} where {whereCols}|]
+    print sql
     n <- execute conn sql (bindVals <> bindPred)
     pure (fromIntegral n)
 
@@ -419,11 +427,17 @@ instance HasSQLOperator (Like a) where
 instance HasColumn t (Proxy a) => HasColumn t (Proxy (Like a)) where
   column pt _ = column pt (Proxy @a)
 
+instance HasColumn t (Proxy a) => HasColumn t (Proxy (NVL a)) where
+  column pt _ = column pt (Proxy @a)
+
 instance ToField a => ToField (Like a) where
   toField (Like x) = toField x
 
 instance HasSQLOperator (InSet a) where
   sqlOperator = const " in ?"
+
+instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Proxy (Maybe a)) where
+  column pt _ = column pt (Proxy @a)
 
 instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Like a) where
   column pt _ = column pt (Proxy @a)
