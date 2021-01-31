@@ -9,24 +9,27 @@ module DB.PG ( module DB
              , module DB.PG
              ) where
 
+import Control.Monad.Catch hiding (Handler)
 import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple hiding (In)
 import Database.PostgreSQL.Simple.ToField
+import Database.PostgreSQL.Simple.ToField (ToField(..))
 import Data.ByteString (ByteString)
-import Control.Monad.Catch hiding (Handler)
-import Data.Int
-import Data.Proxy
 import Data.Data
+import Data.Generics.Traversable
+import Data.Generics.Traversable.Generic
+import Data.Int
+import Data.Maybe
+import Data.Proxy
 import Data.String (IsString(..))
 import Data.Text (Text)
-import GHC.TypeLits
+import Data.Typeable
 import GHC.Generics as Generics
+import GHC.TypeLits
 import qualified Database.PostgreSQL.Simple as PgSimple
-import Database.PostgreSQL.Simple.ToField (ToField(..))
 import qualified Data.List as List
 import qualified Data.Text as Text
 import Text.InterpolatedString.Perl6 (qc)
-import Data.Typeable
 
 import DB
 
@@ -119,6 +122,17 @@ keyValues = KeyValues
 returning :: Returning a
 returning = Returning
 
+class HasQParts t a where
+  qparts :: a -> [QPart t]
+
+instance {-# OVERLAPPABLE #-} (HasColumn t (Proxy a), HasBindValueList a, HasSQLOperator a) => HasQParts t a where
+  qparts x = [QPart x]
+
+instance (HasColumn t (Proxy a), HasBindValueList a, HasSQLOperator a) => HasQParts t (Maybe a) where
+  qparts = fmap QPart . maybeToList
+
+gMakeClauses :: forall t a . (GTraversable (HasQParts t) a) => a -> [QPart t]
+gMakeClauses = gfoldMap @(HasQParts t) (qparts @t)
 
 instance FromRow () where
   fromRow = (field :: (RowParser (Maybe Int)) ) >> pure ()
@@ -277,14 +291,14 @@ instance HasProxy a where
 data QPart (t::Symbol) = forall a . ( HasProxy a
                                     , HasColumn t (Proxy a)
                                     , HasSQLOperator a
-                                    , HasBindValueList a) => QPart (Proxy t) a
+                                    , HasBindValueList a) => QPart a
 
 clause  :: forall t a . ( HasProxy a
                       , HasColumn t (Proxy a)
                       , HasBindValueList a
                       , HasSQLOperator a
                       ) => a -> QPart t
-clause x = QPart (Proxy @t) x
+clause x = QPart x
 
 like :: forall t a . ( HasProxy a
                      , ToField a
@@ -292,24 +306,23 @@ like :: forall t a . ( HasProxy a
                      , HasBindValueList a
                      , HasSQLOperator a
                      ) => Text -> QPart t
-like x = QPart (Proxy @t) (Like @a x)
-
-qparts :: forall t f . [f (QPart t)] -> [f (QPart t)]
-qparts = id
+like x = QPart (Like @a x)
 
 data ToRowItem = forall a . ToField a => ToRowItem a
 
 instance ToField ToRowItem where
   toField (ToRowItem x) = toField x
 
+class GenericBindValueList a
+
 class HasBindValueList a where
   bindValueList :: a -> [ToRowItem]
 
-instance {-# OVERLAPPABLE #-}  ToField a => HasBindValueList a where
-  bindValueList a = [ToRowItem a]
+instance {-# OVERLAPPABLE #-} GHasBindVals a (Rep a) => HasBindValueList a where
+  bindValueList x = gbinds @a @(Rep a) x
 
 instance HasBindValueList (QPart t) where
-  bindValueList (QPart _ x) = bindValueList x
+  bindValueList (QPart x) = bindValueList x
 
 instance HasBindValueList [QPart t] where
   bindValueList a = foldMap bindValueList a
@@ -317,40 +330,6 @@ instance HasBindValueList [QPart t] where
 instance HasBindValueList () where
   bindValueList = const mempty
 
-instance ( ToField a1
-         , ToField a2
-         ) => HasBindValueList (a1,a2) where
-  bindValueList (a1,a2) = bindValueList a1 <> bindValueList a2
-
-instance ( ToField a1
-         , ToField a2
-         , ToField a3
-         ) => HasBindValueList (a1,a2,a3) where
-  bindValueList (a1,a2,a3) =    bindValueList a1
-                             <> bindValueList a2
-                             <> bindValueList a3
-
-instance ( ToField a1
-         , ToField a2
-         , ToField a3
-         , ToField a4
-         ) => HasBindValueList (a1,a2,a3,a4) where
-  bindValueList (a1,a2,a3,a4) =    bindValueList a1
-                                <> bindValueList a2
-                                <> bindValueList a3
-                                <> bindValueList a4
-
-instance ( ToField a1
-         , ToField a2
-         , ToField a3
-         , ToField a4
-         , ToField a5
-         ) => HasBindValueList (a1,a2,a3,a4,a5) where
-  bindValueList (a1,a2,a3,a4,a5) =   bindValueList a1
-                                  <> bindValueList a2
-                                  <> bindValueList a3
-                                  <> bindValueList a4
-                                  <> bindValueList a5
 
 instance (HasBindValueList a, HasBindValueList b) => HasBindValueList (KeyValues a b) where
   bindValueList (KeyValues a b) = bindValueList a <> bindValueList b
@@ -428,14 +407,8 @@ instance {-# OVERLAPPING #-} (KnownSymbol t) => HasColumns (ColumnSet t ()) wher
 
 data ColumnProxy (t::Symbol) = forall a . (HasColumn t (Proxy a)) => ColumnProxy (Proxy t) (Proxy a)
 
-instance {-# OVERLAPPABLE #-}(KnownSymbol t, HasColumn t (Proxy a)) => HasColumns (QueryPart t a) where
-  columns _ = [ exprOf (column (Proxy @t) (Proxy @a)) (sqlOperator (Proxy @a)) ]
-    where
-      exprOf :: Text -> Text -> Text
-      exprOf col op = [qc| {col} {op} |]
-
 class HasSQLOperator a where
-  sqlOperator :: a -> Text
+  sqlOperator :: Proxy a -> Text
 
 instance {-# OVERLAPPABLE #-} HasSQLOperator a where
   sqlOperator = const " = ?"
@@ -452,120 +425,41 @@ instance ToField a => ToField (Like a) where
 instance HasSQLOperator (InSet a) where
   sqlOperator = const " in ?"
 
-instance HasSQLOperator (QPart t) where
-  sqlOperator (QPart _ e) = sqlOperator e
-
 instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Like a) where
   column pt _ = column pt (Proxy @a)
 
--- FIXME: will be screwed on InSet
---        but this is fixable
-instance KnownSymbol t => HasColumns (QueryPart t [QPart t]) where
-  columns (QueryPart xs) = foldMap (\(QPart pt e) -> [strOf (column pt (proxyOf e)) (sqlOperator e)]) xs
+instance {-# OVERLAPPABLE #-} (KnownSymbol t, GHasCols t a (Rep a)) => HasColumns (QueryPart t a) where
+  columns (QueryPart x) =  gcols @t @a @(Rep a) x
+
+class GHasBindVals a (f :: * -> *) where
+  gbinds :: a -> [ToRowItem]
+
+instance ToField a => GHasBindVals a (M1 D ('MetaData i k l 'True) f) where
+  gbinds a = [ToRowItem a]
+
+instance (GTraversable HasBindValueList a) => GHasBindVals a (M1 D ('MetaData i k l 'False) f) where
+  gbinds = gfoldMap @HasBindValueList bindValueList
+
+class GHasCols t a (f :: * -> *) where
+  gcols :: a -> [Text]
+
+instance (HasColumn t (Proxy a)) => GHasCols t a (M1 D ('MetaData i k l 'True) f) where
+  gcols _ = [ exprOf (column (Proxy @t) (Proxy @a)) (sqlOperator (Proxy @a)) ]
     where
-      strOf :: Text -> Text -> Text
-      strOf c op = [qc| {c} {op} |]
-
-instance ( KnownSymbol t
-         , HasColumns (QueryPart t a1)
-         , HasColumns (QueryPart t a2))
-      => HasColumns (QueryPart t (a1,a2)) where
-  columns (QueryPart (x1,x2)) = columns (QueryPart @t x1 ) <> columns (QueryPart @t x2)
+      exprOf :: Text -> Text -> Text
+      exprOf col op = [qc| {col} {op} |]
 
 
-instance ( KnownSymbol t
-         , HasColumns (QueryPart t a1)
-         , HasColumns (QueryPart t a2)
-         , HasColumns (QueryPart t a3))
-      => HasColumns (QueryPart t (a1,a2,a3)) where
-  columns (QueryPart (x1,x2,x3)) =  columns (QueryPart @t x1 )
-                                 <> columns (QueryPart @t x2)
-                                 <> columns (QueryPart @t x3)
+instance (GTraversable (HasQParts t) a) => GHasCols t a (M1 D ('MetaData i k l 'False) f) where
+  gcols x = fmap mkColumn (gMakeClauses @t x)
+    where
+      mkColumn (QPart e) = [qc| {col} {op} |]
+        where col = column (Proxy @t) (proxyOf e)
+              op  = sqlOperator (proxyOf e)
 
 
-instance ( KnownSymbol t
-         , HasColumns (QueryPart t a1)
-         , HasColumns (QueryPart t a2)
-         , HasColumns (QueryPart t a3)
-         , HasColumns (QueryPart t a4)
-         )
-      => HasColumns (QueryPart t (a1,a2,a3,a4)) where
-  columns (QueryPart (x1,x2,x3,x4)) =  columns (QueryPart @t x1)
-                                    <> columns (QueryPart @t x2)
-                                    <> columns (QueryPart @t x3)
-                                    <> columns (QueryPart @t x4)
-
-instance ( KnownSymbol t
-         , HasColumns (QueryPart t a1)
-         , HasColumns (QueryPart t a2)
-         , HasColumns (QueryPart t a3)
-         , HasColumns (QueryPart t a4)
-         , HasColumns (QueryPart t a5)
-         )
-      => HasColumns (QueryPart t (a1,a2,a3,a4,a5)) where
-  columns (QueryPart (x1,x2,x3,x4,x5)) =  columns (QueryPart @t x1)
-                                      <> columns (QueryPart @t x2)
-                                      <> columns (QueryPart @t x3)
-                                      <> columns (QueryPart @t x4)
-                                      <> columns (QueryPart @t x5)
-
-
-instance ( KnownSymbol t
-         , HasColumns (QueryPart t a1)
-         , HasColumns (QueryPart t a2)
-         , HasColumns (QueryPart t a3)
-         , HasColumns (QueryPart t a4)
-         , HasColumns (QueryPart t a5)
-         , HasColumns (QueryPart t a6)
-         )
-      => HasColumns (QueryPart t (a1,a2,a3,a4,a5,a6)) where
-  columns (QueryPart (x1,x2,x3,x4,x5,x6)) =  columns (QueryPart @t x1)
-                                         <> columns (QueryPart @t x2)
-                                         <> columns (QueryPart @t x3)
-                                         <> columns (QueryPart @t x4)
-                                         <> columns (QueryPart @t x5)
-                                         <> columns (QueryPart @t x6)
-
-
-instance ( KnownSymbol t
-         , HasColumns (QueryPart t a1)
-         , HasColumns (QueryPart t a2)
-         , HasColumns (QueryPart t a3)
-         , HasColumns (QueryPart t a4)
-         , HasColumns (QueryPart t a5)
-         , HasColumns (QueryPart t a6)
-         , HasColumns (QueryPart t a7)
-         )
-      => HasColumns (QueryPart t (a1,a2,a3,a4,a5,a6,a7)) where
-  columns (QueryPart (x1,x2,x3,x4,x5,x6,x7)) =  columns (QueryPart @t x1)
-                                         <> columns (QueryPart @t x2)
-                                         <> columns (QueryPart @t x3)
-                                         <> columns (QueryPart @t x4)
-                                         <> columns (QueryPart @t x5)
-                                         <> columns (QueryPart @t x6)
-                                         <> columns (QueryPart @t x7)
-
-instance ( KnownSymbol t
-         , HasColumns (QueryPart t a1)
-         , HasColumns (QueryPart t a2)
-         , HasColumns (QueryPart t a3)
-         , HasColumns (QueryPart t a4)
-         , HasColumns (QueryPart t a5)
-         , HasColumns (QueryPart t a6)
-         , HasColumns (QueryPart t a7)
-         , HasColumns (QueryPart t a8)
-         )
-      => HasColumns (QueryPart t (a1,a2,a3,a4,a5,a6,a7,a8)) where
-  columns (QueryPart (x1,x2,x3,x4,x5,x6,x7,x8)) =  columns (QueryPart @t x1)
-                                         <> columns (QueryPart @t x2)
-                                         <> columns (QueryPart @t x3)
-                                         <> columns (QueryPart @t x4)
-                                         <> columns (QueryPart @t x5)
-                                         <> columns (QueryPart @t x6)
-                                         <> columns (QueryPart @t x7)
-                                         <> columns (QueryPart @t x8)
-
-
+instance HasColumns (QueryPart t [QPart t]) where
+  columns = const mempty
 
 instance HasColumns (QueryPart t ()) where
   columns = const mempty
