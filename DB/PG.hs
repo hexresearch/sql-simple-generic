@@ -207,6 +207,7 @@ instance ( KnownSymbol t
          , HasBindValueList ()
          , HasBindValueList pred
          , ToRow values
+         , values ~ ()
          ) => UpdateStatement (Update (Table t) (Values ()) (Where pred)) IO PostgreSQLEngine where
   type UpdateResult (Update (Table t) (Values ()) (Where pred)) = Integer
   update eng _ = pure 0
@@ -454,7 +455,7 @@ instance ToField a => GHasBindVals a (M1 D ('MetaData i k l 'True) f) where
 instance (GTraversable HasBindValueList a) => GHasBindVals a (M1 D ('MetaData i k l 'False) f) where
   gbinds = gfoldMap @HasBindValueList bindValueList
 
-class GHasCols t a (f :: * -> *) where
+class GHasCols t a (f :: * -> *)  where
   gcols :: a -> [Text]
 
 instance (HasColumn t (Proxy a)) => GHasCols t a (M1 D ('MetaData i k l 'True) f) where

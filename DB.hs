@@ -1,7 +1,10 @@
+{-# LANGUAGE UndecidableInstances, QuantifiedConstraints #-}
 module DB where
 
 import GHC.TypeLits
 import Data.Text (Text)
+import Data.String (fromString)
+import GHC.TypeLits
 import Data.Proxy
 
 -- DAL/Abstract
@@ -12,6 +15,11 @@ class KnownSymbol t => HasColumn t a where
 
 class HasColumns a where
   columns :: a -> [Text]
+
+type family ColumnName a (t::Symbol) :: Symbol
+
+instance {-# OVERLAPPABLE #-} (KnownSymbol (ColumnName a t), KnownSymbol t) => HasColumn t (Proxy a) where
+  column _ _ = fromString $ symbolVal (Proxy @(ColumnName a t))
 
 class HasTable a e where
   tablename :: e -> a -> Text
