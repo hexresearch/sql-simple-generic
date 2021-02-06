@@ -102,6 +102,9 @@ newtype InSet a = InSet [a]
 newtype Like a = Like Text
                  deriving (Show,Data,Generic)
 
+newtype ILike a = ILike Text
+                  deriving (Show,Data,Generic)
+
 -- FIXME: implement
 data NVL a = NVL a
              deriving (Eq,Ord,Show,Data,Generic)
@@ -426,7 +429,13 @@ instance {-# OVERLAPPABLE #-} HasSQLOperator a where
 instance HasSQLOperator (Like a) where
   sqlOperator = const " like ?"
 
+instance HasSQLOperator (ILike a) where
+  sqlOperator = const " ilike ?"
+
 instance HasColumn t (Proxy a) => HasColumn t (Proxy (Like a)) where
+  column pt _ = column pt (Proxy @a)
+
+instance HasColumn t (Proxy a) => HasColumn t (Proxy (ILike a)) where
   column pt _ = column pt (Proxy @a)
 
 instance HasColumn t (Proxy a) => HasColumn t (Proxy (NVL a)) where
@@ -435,6 +444,9 @@ instance HasColumn t (Proxy a) => HasColumn t (Proxy (NVL a)) where
 instance ToField a => ToField (Like a) where
   toField (Like x) = toField x
 
+instance ToField a => ToField (ILike a) where
+  toField (ILike x) = toField x
+
 instance HasSQLOperator (InSet a) where
   sqlOperator = const " in ?"
 
@@ -442,6 +454,9 @@ instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Proxy (Maybe a))
   column pt _ = column pt (Proxy @a)
 
 instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (Like a) where
+  column pt _ = column pt (Proxy @a)
+
+instance (KnownSymbol t, HasColumn t (Proxy a)) => HasColumn t (ILike a) where
   column pt _ = column pt (Proxy @a)
 
 instance {-# OVERLAPPABLE #-} (KnownSymbol t, GHasCols t a (Rep a)) => HasColumns (QueryPart t a) where
