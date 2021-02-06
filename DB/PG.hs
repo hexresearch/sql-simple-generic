@@ -97,6 +97,7 @@ data All a = All
 data Pred a = Eq a
 
 newtype InSet a = InSet [a]
+                  deriving (Data,Generic)
 
 newtype Like a = Like Text
                  deriving (Show,Data,Generic)
